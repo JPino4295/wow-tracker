@@ -204,6 +204,20 @@ def mark_progress(
     return _must_get_item(connection, item_id)
 
 
+@app.post("/api/users", response_model=MetaOut, status_code=http_status.HTTP_201_CREATED)
+def add_user(
+    payload: UserUpdate,
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> MetaOut:
+    try:
+        repo.create_user(connection, payload.name)
+    except sqlite3.IntegrityError as err:
+        raise HTTPException(
+            http_status.HTTP_409_CONFLICT, "That name is already in use"
+        ) from err
+    return meta(connection)
+
+
 @app.patch("/api/users/{user_id}", response_model=MetaOut)
 def edit_user(
     user_id: int,

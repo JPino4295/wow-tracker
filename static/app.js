@@ -449,6 +449,24 @@ function openEdit(item) {
   $('edit-dialog').showModal();
 }
 
+async function createUser() {
+  const input = $('new-user-name');
+  const name = input.value.trim();
+  if (!name) {
+    window.alert('Escribe el nombre del nuevo jugador.');
+    return;
+  }
+  try {
+    await api('/api/users', jsonOptions('POST', { name }));
+    input.value = '';
+    await loadMeta();
+    await loadItems();
+    renderSettingsUsers();
+  } catch (error) {
+    window.alert(error.message);
+  }
+}
+
 async function removeUser(entry) {
   const message = `¿Eliminar a ${entry.name}?\n\n`
     + 'Solo se permite si no es el último jugador y no tiene objetos asignados '
@@ -456,15 +474,15 @@ async function removeUser(entry) {
   if (!window.confirm(message)) return;
   try {
     await api(`/api/users/${entry.id}`, { method: 'DELETE' });
-    $('settings-dialog').close();
     await loadMeta();
     await loadItems();
+    renderSettingsUsers();
   } catch (error) {
     window.alert(error.message);
   }
 }
 
-function openSettings() {
+function renderSettingsUsers() {
   const container = $('settings-users');
   container.replaceChildren();
   for (const entry of state.users) {
@@ -491,6 +509,32 @@ function openSettings() {
     row.append(label, remove);
     container.append(row);
   }
+
+  const addRow = el('div', 'user-row add-user-row');
+  const addLabel = el('label', null, 'Nuevo jugador');
+  const addInput = el('input');
+  addInput.id = 'new-user-name';
+  addInput.type = 'text';
+  addInput.maxLength = 100;
+  addInput.placeholder = 'Nombre del jugador';
+  addLabel.append(addInput);
+  const addButton = el('button', 'icon-btn primary', '+');
+  addButton.type = 'button';
+  addButton.title = 'Añadir jugador';
+  addButton.setAttribute('aria-label', 'Añadir jugador');
+  addButton.addEventListener('click', createUser);
+  addInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      createUser();
+    }
+  });
+  addRow.append(addLabel, addButton);
+  container.append(addRow);
+}
+
+function openSettings() {
+  renderSettingsUsers();
   $('settings-dialog').showModal();
 }
 

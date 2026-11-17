@@ -76,6 +76,7 @@ textarea { resize: vertical; width: 100%; }
 .danger { border-color: #8f3b3b; color: #ffb4b4; }
 .user-row { display: flex; gap: .5rem; align-items: end; }
 .user-row label { flex: 1; }
+.add-user-row { margin-top: .8rem; padding-top: .8rem; border-top: 1px solid var(--border); }
 
 main { padding: 1.25rem clamp(1rem, 3vw, 2rem) 3rem; max-width: 1400px; margin: 0 auto; }
 

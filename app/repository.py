@@ -62,6 +62,14 @@ def item_exists(connection: sqlite3.Connection, item_id: int) -> bool:
     )
 
 
+def create_user(connection: sqlite3.Connection, name: str) -> int:
+    cursor = connection.execute(
+        "INSERT INTO users (name, created_at) VALUES (?, ?)", (name, timestamp())
+    )
+    connection.commit()
+    return int(cursor.lastrowid)
+
+
 def rename_user(connection: sqlite3.Connection, user_id: int, name: str) -> bool:
     cursor = connection.execute("UPDATE users SET name = ? WHERE id = ?", (name, user_id))
     connection.commit()

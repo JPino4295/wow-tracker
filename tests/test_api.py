@@ -373,6 +373,32 @@ def test_user_without_data_can_be_deleted_and_is_not_reseeded(
     assert [user["id"] for user in client.get("/api/meta").json()["users"]] == [first]
 
 
+def test_user_can_be_created_with_a_unique_non_blank_name(
+    client: TestClient,
+) -> None:
+    before = client.get("/api/meta").json()["users"]
+
+    created = client.post("/api/users", json={"name": "  Nueva jugadora  "})
+    assert created.status_code == 201, created.text
+    after = created.json()["users"]
+    assert len(after) == len(before) + 1
+    assert after[-1]["name"] == "Nueva jugadora"
+
+    duplicate = client.post("/api/users", json={"name": "Nueva jugadora"})
+    assert duplicate.status_code == 409
+
+    blank = client.post("/api/users", json={"name": "   "})
+    assert blank.status_code == 422
+
+    # The newly created player can own items just like the seeded ones.
+    new_id = after[-1]["id"]
+    item = client.post(
+        "/api/items", json={**mount_payload(), "owner_user_id": new_id}
+    )
+    assert item.status_code == 201, item.text
+    assert item.json()["owner_user_id"] == new_id
+
+
 def test_user_deletion_is_blocked_when_last_or_still_referenced(
     client: TestClient,
 ) -> None:

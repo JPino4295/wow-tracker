@@ -124,10 +124,11 @@ algo no cambia el estado del otro jugador.
 ## 5. Uso de la interfaz
 
 - El **selector "Visto por"** elige qué jugador se ve; se recuerda en el navegador.
-- En **⚙** puedes renombrar jugadores y borrarlos con **🗑**. No se puede eliminar al
-  último jugador, ni a uno con objetos asignados («Para quién») o con progreso
-  marcado: reasígnalos o desmárcalos antes. Un jugador borrado no reaparece al
-  reiniciar el contenedor.
+- En **⚙** puedes renombrar jugadores, añadir nuevos con **+ Añadir jugador** y
+  borrarlos con **🗑**. El nombre del jugador es obligatorio y único (no puede
+  repetirse). No se puede eliminar al último jugador, ni a uno con objetos
+  asignados («Para quién») o con progreso marcado: reasígnalos o desmárcalos antes.
+  Un jugador borrado no reaparece al reiniciar el contenedor.
 - Los **filtros** (tipo, periodicidad, fuente, tipo de fuente, estado y texto) se
   combinan entre sí; el botón **Limpiar** los resetea.
 - Clic en una fila abre la **ficha**: descripción, relaciones N:M de fuentes con
