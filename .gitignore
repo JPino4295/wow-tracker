@@ -1,0 +1,45 @@
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local runtime data (SQLite DB, uploaded icons, backups)
+data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.gz
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+
+# Tooling and editor state
+.opencode/
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and build artifacts
+*.log
+build/
+dist/
+node_modules/

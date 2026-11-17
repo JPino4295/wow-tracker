@@ -1,0 +1,26 @@
+services:
+  wow-tracker:
+    build: .
+    container_name: wow-tracker
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      DATA_DIR: /data
+      DAILY_RESET_HOUR_UTC: "7"
+      WEEKLY_RESET_WEEKDAY: "1"
+      WEEKLY_RESET_HOUR_UTC: "7"
+      USER_1_NAME: "Jugador 1"
+      USER_2_NAME: "Jugador 2"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

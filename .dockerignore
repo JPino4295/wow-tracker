@@ -1,0 +1,13 @@
+.git
+.gitignore
+.venv
+.opencode
+data
+tests
+__pycache__
+*.py[cod]
+.pytest_cache
+.env*
+README.md
+deploy.sh
+docker-compose.yml

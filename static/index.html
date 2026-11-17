@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0e1117" />
+    <title>WoW Farm Tracker</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-icon" aria-hidden="true">⚔️</span>
+        <div>
+          <h1>WoW Farm Tracker</h1>
+          <p id="reset-info" class="muted small">Cargando…</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <label class="inline" for="user-select">Visto por</label>
+        <select id="user-select" aria-label="Jugador activo"></select>
+        <button id="btn-settings" class="icon-btn" type="button" aria-label="Editar nombres" title="Editar nombres">⚙</button>
+        <button id="btn-add" class="primary" type="button">+ Añadir objeto</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="filters" aria-label="Filtros">
+        <label>Tipo
+          <select id="f-type">
+            <option value="">Todos</option>
+            <option value="mount">Montura</option>
+            <option value="transmog">Transfiguración</option>
+            <option value="toy">Juguete</option>
+            <option value="pet">Mascota</option>
+            <option value="other">Otros</option>
+          </select>
+        </label>
+        <label>Periodicidad
+          <select id="f-periodicity">
+            <option value="">Todas</option>
+            <option value="daily">Diaria</option>
+            <option value="weekly">Semanal</option>
+          </select>
+        </label>
+        <label>Fuente
+          <select id="f-source"><option value="">Todas</option></select>
+        </label>
+        <label>Tipo de fuente
+          <select id="f-source-kind">
+            <option value="">Todos</option>
+            <option value="raid">Raid</option>
+            <option value="rare">Rare</option>
+            <option value="boss">Boss</option>
+          </select>
+        </label>
+        <label>Estado
+          <select id="f-status">
+            <option value="">Todos</option>
+            <option value="pending">Pendiente</option>
+            <option value="done">Hecho</option>
+          </select>
+        </label>
+        <label>Buscar
+          <input id="f-q" type="search" placeholder="Nombre o descripción" />
+        </label>
+        <button id="btn-clear" class="ghost" type="button">Limpiar</button>
+      </section>
+
+      <p id="summary" class="summary" role="status"></p>
+      <section id="item-list" class="cards" aria-label="Listado de objetos"></section>
+    </main>
+
+    <dialog id="detail-dialog" class="modal">
+      <button class="close" type="button" data-close aria-label="Cerrar ficha">✕</button>
+      <div id="detail-body"></div>
+    </dialog>
+
+    <dialog id="add-dialog" class="modal">
+      <button class="close" type="button" data-close aria-label="Cerrar formulario">✕</button>
+      <h2>Añadir objeto</h2>
+      <form id="add-form">
+        <div class="form-grid">
+          <label class="span-2">Nombre *
+            <input name="name" required maxlength="200" placeholder="Riendas de la venganza" />
+          </label>
+          <label>Wowhead ID
+            <input name="wowhead_id" type="number" min="1" placeholder="137539" />
+          </label>
+          <label>URL de Wowhead
+            <input name="url_wowhead" type="url" placeholder="https://www.wowhead.com/es/item=…" />
+          </label>
+          <label>Tipo *
+            <select name="type">
+              <option value="mount">Montura</option>
+              <option value="transmog">Transfiguración</option>
+              <option value="toy">Juguete</option>
+              <option value="pet">Mascota</option>
+              <option value="other">Otros</option>
+            </select>
+          </label>
+          <label>Periodicidad *
+            <select name="periodicity">
+              <option value="weekly">Semanal</option>
+              <option value="daily">Diaria</option>
+            </select>
+          </label>
+          <label>Para quién
+            <select name="owner_user_id" id="add-owner"><option value="">Ambos</option></select>
+          </label>
+          <label class="span-2">Icono local (nombre de archivo en data/images o URL)
+            <input name="icon_local" placeholder="137539.png" />
+          </label>
+          <label class="span-2">Descripción
+            <textarea name="description" rows="2"></textarea>
+          </label>
+          <label class="span-2">Notas
+            <textarea name="notes" rows="2"></textarea>
+          </label>
+          <label class="span-2">Fuentes (multi-selección)
+            <select name="source_ids" id="add-sources" multiple size="4"></select>
+          </label>
+          <label>Drop rate (%)
+            <input name="drop_rate" type="number" min="0" max="100" step="0.01" />
+          </label>
+          <label>Dificultad
+            <input name="difficulty" placeholder="Heroica, Mythic…" />
+          </label>
+          <label class="span-2">Condiciones especiales
+            <textarea name="conditions" rows="2" placeholder="Solo en dificultad mítica, requiere…"></textarea>
+          </label>
+        </div>
+
+        <fieldset class="quick-source">
+          <legend>¿Falta una fuente? Créala aquí</legend>
+          <div class="form-grid">
+            <label>Nombre <input id="new-source-name" placeholder="Sagrario de dominación" /></label>
+            <label>Tipo
+              <select id="new-source-kind">
+                <option value="raid">Raid</option>
+                <option value="boss">Boss</option>
+                <option value="rare">Rare</option>
+              </select>
+            </label>
+            <label>Zona <input id="new-source-zone" /></label>
+            <label>URL <input id="new-source-url" type="url" /></label>
+          </div>
+          <button id="btn-new-source" class="ghost" type="button">+ Crear fuente</button>
+        </fieldset>
+
+        <div class="dialog-actions">
+          <button class="ghost" type="button" data-close>Cancelar</button>
+          <button class="primary" type="submit">Guardar objeto</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="settings-dialog" class="modal">
+      <button class="close" type="button" data-close aria-label="Cerrar ajustes">✕</button>
+      <h2>Nombres de jugadores</h2>
+      <form id="settings-form">
+        <div id="settings-users" class="form-grid"></div>
+        <div class="dialog-actions">
+          <button class="ghost" type="button" data-close>Cancelar</button>
+          <button class="primary" type="submit">Guardar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
