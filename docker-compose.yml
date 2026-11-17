@@ -10,7 +10,7 @@ services:
     environment:
       DATA_DIR: /data
       DAILY_RESET_HOUR_UTC: "7"
-      WEEKLY_RESET_WEEKDAY: "1"
+      WEEKLY_RESET_WEEKDAY: "2"
       WEEKLY_RESET_HOUR_UTC: "7"
       USER_1_NAME: "Jugador 1"
       USER_2_NAME: "Jugador 2"

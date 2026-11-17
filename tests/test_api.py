@@ -56,7 +56,7 @@ def test_health_and_meta_expose_two_users_and_reset_config(client: TestClient) -
     meta = client.get("/api/meta").json()
     assert [user["name"] for user in meta["users"]] == ["Jugador 1", "Jugador 2"]
     assert meta["daily_hour_utc"] == 7
-    assert meta["weekly_weekday"] == 1
+    assert meta["weekly_weekday"] == 2
     assert meta["weekly_hour_utc"] == 7
 
 
@@ -232,7 +232,7 @@ def test_progress_resets_on_read_after_the_configured_weekly_reset(
 ) -> None:
     item_id = client.post("/api/items", json=mount_payload()).json()["id"]
     user_id = client.get("/api/meta").json()["users"][0]["id"]
-    moment = datetime(2026, 11, 17, 12, 0, tzinfo=UTC)  # Tuesday
+    moment = datetime(2026, 11, 18, 12, 0, tzinfo=UTC)  # Wednesday
 
     monkeypatch.setenv("WEEKLY_RESET_HOUR_UTC", "12")
     monkeypatch.setattr("app.main.utc_now", lambda: moment)
@@ -241,12 +241,12 @@ def test_progress_resets_on_read_after_the_configured_weekly_reset(
     assert client.get(f"/api/items/{item_id}").json()["progress"][str(user_id)]["done"] is True
 
     # One minute before the next reset it is still done.
-    just_before = datetime(2026, 11, 24, 11, 59, tzinfo=UTC)
+    just_before = datetime(2026, 11, 25, 11, 59, tzinfo=UTC)
     monkeypatch.setattr("app.main.utc_now", lambda: just_before)
     assert client.get(f"/api/items/{item_id}").json()["progress"][str(user_id)]["done"] is True
 
-    # After Tuesday 12:00 UTC it becomes pending without any scheduled task.
-    just_after = datetime(2026, 11, 24, 12, 1, tzinfo=UTC)
+    # After Wednesday 12:00 UTC it becomes pending without any scheduled task.
+    just_after = datetime(2026, 11, 25, 12, 1, tzinfo=UTC)
     monkeypatch.setattr("app.main.utc_now", lambda: just_after)
     assert client.get(f"/api/items/{item_id}").json()["progress"][str(user_id)]["done"] is False
 

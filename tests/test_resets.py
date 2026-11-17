@@ -10,7 +10,7 @@ from app.config import ResetConfig
 from app.resets import as_utc, is_done, next_reset, parse_timestamp, period_start
 
 UTC = timezone.utc
-DEFAULT = ResetConfig(daily_hour_utc=7, weekly_weekday=1, weekly_hour_utc=7)
+DEFAULT = ResetConfig(daily_hour_utc=7, weekly_weekday=2, weekly_hour_utc=7)
 
 
 @pytest.mark.parametrize(
@@ -31,19 +31,20 @@ def test_daily_period_starts_at_configured_utc_hour(
 @pytest.mark.parametrize(
     ("moment", "expected_start"),
     [
-        # Monday before Tuesday reset: still last week's period.
-        (datetime(2026, 11, 16, 23, 0), datetime(2026, 11, 10, 7, 0)),
-        # Tuesday just before and exactly at reset.
-        (datetime(2026, 11, 17, 6, 59, 59), datetime(2026, 11, 10, 7, 0)),
-        (datetime(2026, 11, 17, 7, 0), datetime(2026, 11, 17, 7, 0)),
+        # Monday and Tuesday before Wednesday reset: still last week's period.
+        (datetime(2026, 11, 16, 23, 0), datetime(2026, 11, 11, 7, 0)),
+        (datetime(2026, 11, 17, 6, 59, 59), datetime(2026, 11, 11, 7, 0)),
+        # Wednesday just before and exactly at reset.
+        (datetime(2026, 11, 18, 6, 59, 59), datetime(2026, 11, 11, 7, 0)),
+        (datetime(2026, 11, 18, 7, 0), datetime(2026, 11, 18, 7, 0)),
         # Rest of the week stays in the same period.
-        (datetime(2026, 11, 18, 12, 0), datetime(2026, 11, 17, 7, 0)),
-        (datetime(2026, 11, 22, 23, 59), datetime(2026, 11, 17, 7, 0)),
-        # Following Tuesday resets again.
-        (datetime(2026, 11, 24, 7, 1), datetime(2026, 11, 24, 7, 0)),
+        (datetime(2026, 11, 19, 12, 0), datetime(2026, 11, 18, 7, 0)),
+        (datetime(2026, 11, 24, 23, 59), datetime(2026, 11, 18, 7, 0)),
+        # Following Wednesday resets again.
+        (datetime(2026, 11, 25, 7, 1), datetime(2026, 11, 25, 7, 0)),
     ],
 )
-def test_weekly_period_is_anchored_to_tuesday_0700_utc(
+def test_weekly_period_is_anchored_to_wednesday_0700_utc(
     moment: datetime, expected_start: datetime
 ) -> None:
     assert period_start(moment, "weekly", DEFAULT) == expected_start.replace(tzinfo=UTC)
@@ -53,13 +54,14 @@ def test_aware_datetimes_are_converted_to_utc_before_computing() -> None:
     # 08:30 in UTC+2 == 06:30 UTC, i.e. before the 07:00 reset.
     moment = datetime(2026, 11, 17, 8, 30, tzinfo=timezone(timedelta(hours=2)))
     assert period_start(moment, "daily", DEFAULT) == datetime(2026, 11, 16, 7, 0, tzinfo=UTC)
-    assert period_start(moment, "weekly", DEFAULT) == datetime(2026, 11, 10, 7, 0, tzinfo=UTC)
+    assert period_start(moment, "weekly", DEFAULT) == datetime(2026, 11, 11, 7, 0, tzinfo=UTC)
 
 
 def test_naive_datetimes_are_treated_as_utc() -> None:
     moment = datetime(2026, 11, 17, 6, 30)
     assert as_utc(moment) == moment.replace(tzinfo=UTC)
     assert period_start(moment, "daily", DEFAULT) == datetime(2026, 11, 16, 7, 0, tzinfo=UTC)
+    assert period_start(moment, "weekly", DEFAULT) == datetime(2026, 11, 11, 7, 0, tzinfo=UTC)
 
 
 def test_custom_reset_constants_change_the_anchor(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -101,9 +103,9 @@ def test_is_done_for_daily_progress(last_done_at: str | None, expected: bool) ->
 @pytest.mark.parametrize(
     ("last_done_at", "expected"),
     [
-        ("2026-11-10T07:00:00+00:00", False),
-        ("2026-11-16T23:00:00+00:00", False),
-        ("2026-11-17T07:00:00+00:00", True),
+        ("2026-11-11T07:00:00+00:00", False),
+        ("2026-11-17T07:00:00+00:00", False),
+        ("2026-11-18T07:00:00+00:00", True),
         ("2026-11-22T23:00:00+00:00", True),
     ],
 )
@@ -115,7 +117,7 @@ def test_is_done_for_weekly_progress(last_done_at: str | None, expected: bool) -
 def test_next_reset_is_one_period_after_current_start() -> None:
     now = datetime(2026, 11, 17, 12, 0, tzinfo=UTC)
     assert next_reset(now, "daily", DEFAULT) == datetime(2026, 11, 18, 7, 0, tzinfo=UTC)
-    assert next_reset(now, "weekly", DEFAULT) == datetime(2026, 11, 24, 7, 0, tzinfo=UTC)
+    assert next_reset(now, "weekly", DEFAULT) == datetime(2026, 11, 18, 7, 0, tzinfo=UTC)
 
 
 def test_parse_timestamp_accepts_both_z_and_offset() -> None:

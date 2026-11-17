@@ -96,7 +96,7 @@ docker compose up -d --build
 | `DATA_DIR` | `/data` en Docker | Directorio del volumen (db, imágenes, backups) |
 | `DB_PATH` | `<DATA_DIR>/tracker.db` | Ruta exacta del fichero SQLite |
 | `DAILY_RESET_HOUR_UTC` | `7` | Hora UTC del reset diario |
-| `WEEKLY_RESET_WEEKDAY` | `1` | Día del reset semanal (0=lunes, 1=martes) |
+| `WEEKLY_RESET_WEEKDAY` | `2` | Día del reset semanal (0=lunes, 1=martes, 2=miércoles) |
 | `WEEKLY_RESET_HOUR_UTC` | `7` | Hora UTC del reset semanal |
 | `USER_1_NAME` / `USER_2_NAME` | `Jugador 1` / `Jugador 2` | Nombres iniciales (luego editables en la web) |
 
@@ -108,11 +108,11 @@ No hay cron, ni tareas en segundo plano, ni columna "reset"). Al leer cada objet
 se calcula el inicio del periodo vigente:
 
 - **Diario:** último `07:00 UTC` ya pasado.
-- **Semanal:** último **martes 07:00 UTC** ya pasado (reset EU).
+- **Semanal:** último **miércoles 07:00 UTC** ya pasado (reset EU).
 
 Un registro de progreso cuenta como *hecho* solo si su `last_done_at` es posterior
 o igual al inicio del periodo actual. Por eso un objeto marcado el lunes pasa a
-pendiente el martes por la mañana sin que nadie escriba en la base de datos.
+pendiente el miércoles por la mañana sin que nadie escriba en la base de datos.
 Todo se calcula en UTC con `zoneinfo`; los cambios de horario de verano no afectan.
 Las tres constantes se pueden sobreescribir por entorno (tabla anterior).
 

@@ -44,14 +44,14 @@ class ResetConfig:
     """Reset moments expressed in UTC, so daylight saving never shifts them."""
 
     daily_hour_utc: int = 7
-    weekly_weekday: int = 1  # 0 = Monday, 1 = Tuesday
+    weekly_weekday: int = 2  # 0 = Monday, 1 = Tuesday, 2 = Wednesday
     weekly_hour_utc: int = 7
 
     @classmethod
     def from_env(cls) -> "ResetConfig":
         return cls(
             daily_hour_utc=_env_int("DAILY_RESET_HOUR_UTC", 7, 0, 23),
-            weekly_weekday=_env_int("WEEKLY_RESET_WEEKDAY", 1, 0, 6),
+            weekly_weekday=_env_int("WEEKLY_RESET_WEEKDAY", 2, 0, 6),
             weekly_hour_utc=_env_int("WEEKLY_RESET_HOUR_UTC", 7, 0, 23),
         )
 
