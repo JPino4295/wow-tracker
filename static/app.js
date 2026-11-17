@@ -109,25 +109,38 @@ function isForeign(item) {
   return item.owner_user_id !== null && item.owner_user_id !== state.userId;
 }
 
+function selectedValues(select) {
+  return Array.from(select.selectedOptions, (option) => option.value);
+}
+
+function selectValues(select, values) {
+  for (const option of select.options) option.selected = values.includes(option.value);
+}
+
 function renderSourceOptions() {
   const filter = $('f-source');
-  const previous = filter.value;
+  const filterPrevious = filter.value;
+  const add = $('add-sources');
+  const edit = $('edit-sources');
+  const addPrevious = selectedValues(add);
+  const editPrevious = selectedValues(edit);
+
   filter.replaceChildren(el('option', null, 'Todas'));
   filter.firstChild.value = '';
-  for (const source of state.sources) {
-    const option = el('option', null, `${source.name} · ${KIND_LABELS[source.kind]}`);
-    option.value = String(source.id);
-    filter.append(option);
-  }
-  filter.value = previous;
-
-  const add = $('add-sources');
   add.replaceChildren();
+  edit.replaceChildren();
+
   for (const source of state.sources) {
-    const option = el('option', null, `${source.name} · ${KIND_LABELS[source.kind]}`);
-    option.value = String(source.id);
-    add.append(option);
+    const label = `${source.name} · ${KIND_LABELS[source.kind]}`;
+    for (const select of [filter, add, edit]) {
+      const option = el('option', null, label);
+      option.value = String(source.id);
+      select.append(option);
+    }
   }
+  filter.value = filterPrevious;
+  selectValues(add, addPrevious);
+  selectValues(edit, editPrevious);
 }
 
 async function loadMeta() {
@@ -431,6 +444,7 @@ function openEdit(item) {
   form.elements['icon_local'].value = item.icon_local || '';
   form.elements['description'].value = item.description || '';
   form.elements['notes'].value = item.notes || '';
+  selectValues($('edit-sources'), item.sources.map((link) => String(link.source_id)));
   $('edit-dialog').showModal();
 }
 
@@ -518,7 +532,10 @@ function bindEvents() {
     const form = event.currentTarget;
     const data = new FormData(form);
     const itemId = Number(data.get('item_id'));
+    const original = state.items.find((entry) => entry.id === itemId);
     const wowheadId = data.get('wowhead_id') ? Number(data.get('wowhead_id')) : null;
+    const sourceIds = data.getAll('source_ids').map(Number);
+    const originalIds = original ? original.sources.map((link) => link.source_id) : [];
     const payload = {
       name: data.get('name'),
       wowhead_id: wowheadId,
@@ -531,6 +548,24 @@ function bindEvents() {
       description: data.get('description') || '',
       notes: data.get('notes') || '',
     };
+    // Only overwrite item_sources when the selection changed, so existing
+    // drop rate/difficulty/conditions edited in the detail view are preserved.
+    const sourcesChanged = sourceIds.length !== originalIds.length
+      || sourceIds.some((id) => !originalIds.includes(id));
+    if (sourcesChanged) {
+      const links = new Map(
+        original ? original.sources.map((link) => [link.source_id, link]) : []
+      );
+      payload.sources = sourceIds.map((source_id) => {
+        const link = links.get(source_id);
+        return {
+          source_id,
+          drop_rate: link ? link.drop_rate : null,
+          difficulty: link ? link.difficulty || '' : '',
+          conditions: link ? link.conditions || '' : '',
+        };
+      });
+    }
     try {
       const updated = await api(`/api/items/${itemId}`, jsonOptions('PATCH', payload));
       const index = state.items.findIndex((entry) => entry.id === itemId);
@@ -543,12 +578,12 @@ function bindEvents() {
     }
   });
 
-  $('btn-new-source').addEventListener('click', async () => {
+  async function createSource(prefix, targetId) {
     const payload = {
-      name: $('new-source-name').value.trim(),
-      kind: $('new-source-kind').value,
-      zone: $('new-source-zone').value.trim(),
-      wowhead_url: $('new-source-url').value.trim(),
+      name: $(`${prefix}-name`).value.trim(),
+      kind: $(`${prefix}-kind`).value,
+      zone: $(`${prefix}-zone`).value.trim(),
+      wowhead_url: $(`${prefix}-url`).value.trim(),
     };
     if (!payload.name) {
       window.alert('Escribe el nombre de la fuente.');
@@ -556,16 +591,18 @@ function bindEvents() {
     }
     try {
       const created = await api('/api/sources', jsonOptions('POST', payload));
-      $('new-source-name').value = '';
-      $('new-source-zone').value = '';
-      $('new-source-url').value = '';
+      for (const suffix of ['name', 'zone', 'url']) $(`${prefix}-${suffix}`).value = '';
       await loadSources();
-      const option = Array.from($('add-sources').options).find((entry) => entry.value === String(created.id));
+      const option = Array.from($(targetId).options)
+        .find((entry) => entry.value === String(created.id));
       if (option) option.selected = true;
     } catch (error) {
       window.alert(error.message);
     }
-  });
+  }
+
+  $('btn-new-source').addEventListener('click', () => createSource('new-source', 'add-sources'));
+  $('edit-btn-new-source').addEventListener('click', () => createSource('edit-new-source', 'edit-sources'));
 
   $('settings-form').addEventListener('submit', async (event) => {
     event.preventDefault();

@@ -324,3 +324,34 @@ def test_item_can_be_edited_completely(client: TestClient) -> None:
     assert body["icon_local"] == "juguete.png"
     assert body["description"] == "Descripción nueva"
     assert body["notes"] == "Notas nuevas"
+
+
+def test_sources_can_be_added_later_and_survive_unrelated_edits(
+    client: TestClient, source_id: int
+) -> None:
+    item_id = client.post("/api/items", json=mount_payload()).json()["id"]
+    assert client.get(f"/api/items/{item_id}").json()["sources"] == []
+
+    added = client.patch(
+        f"/api/items/{item_id}",
+        json={
+            "sources": [
+                {
+                    "source_id": source_id,
+                    "drop_rate": 15,
+                    "difficulty": "Mítico",
+                    "conditions": "Solo con la Rare activa",
+                }
+            ]
+        },
+    )
+    assert added.status_code == 200, added.text
+    assert added.json()["sources"][0]["drop_rate"] == 15
+
+    renamed = client.patch(f"/api/items/{item_id}", json={"name": "Montura renombrada"})
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["name"] == "Montura renombrada"
+    link = renamed.json()["sources"][0]
+    assert link["source_id"] == source_id
+    assert link["drop_rate"] == 15
+    assert link["difficulty"] == "Mítico"

@@ -197,7 +197,28 @@
           <label class="span-2">Notas
             <textarea name="notes" rows="2"></textarea>
           </label>
+          <label class="span-2">Fuentes (multi-selección)
+            <select name="source_ids" id="edit-sources" multiple size="4"></select>
+          </label>
         </div>
+
+        <fieldset class="quick-source">
+          <legend>¿Falta una fuente? Créala aquí</legend>
+          <div class="form-grid">
+            <label>Nombre <input id="edit-new-source-name" placeholder="Sagrario de dominación" /></label>
+            <label>Tipo
+              <select id="edit-new-source-kind">
+                <option value="raid">Raid</option>
+                <option value="boss">Boss</option>
+                <option value="rare">Rare</option>
+              </select>
+            </label>
+            <label>Zona <input id="edit-new-source-zone" /></label>
+            <label>URL <input id="edit-new-source-url" type="url" /></label>
+          </div>
+          <button id="edit-btn-new-source" class="ghost" type="button">+ Crear fuente</button>
+        </fieldset>
+
         <div class="dialog-actions">
           <button class="ghost" type="button" data-close>Cancelar</button>
           <button class="primary" type="submit">Guardar cambios</button>

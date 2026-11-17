@@ -137,8 +137,12 @@ algo no cambia el estado del otro jugador.
   nombre de archivo en `data/images/` y se sirve desde `/media/<nombre>` (también
   admite URL).
 - El botón **✎ Editar** de la ficha abre el formulario completo para cambiar nombre,
-  Wowhead ID/URL, tipo, periodicidad, «Para quién», icono, descripción y notas. Las
-  fuentes y su drop rate/dificultad/condiciones se siguen editando en la propia ficha.
+  Wowhead ID/URL, tipo, periodicidad, «Para quién», icono, descripción, notas **y
+  fuentes**. También incluye el creador rápido de fuentes, así que puedes añadir una
+  fuente nueva a un objeto que se creó sin ninguna. Si no cambias la selección, se
+  conservan el drop rate/dificultad/condiciones ya guardados; si la cambias, esos
+  valores se mantienen para las fuentes que sigan seleccionadas. Las fuentes ya
+  asignadas también se pueden editar desde la propia ficha.
 - Los objetos asignados a otro jugador **siguen apareciendo en el listado**, pero se
   muestran atenuados con la etiqueta «Solo para X». Su ficha es de **solo lectura**:
   no se pueden editar drop rate/dificultad/condiciones ni notas, y el botón de
