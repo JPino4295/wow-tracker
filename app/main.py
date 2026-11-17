@@ -221,6 +221,32 @@ def edit_user(
     return meta(connection)
 
 
+@app.delete("/api/users/{user_id}", status_code=http_status.HTTP_204_NO_CONTENT)
+def remove_user(
+    user_id: int,
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> None:
+    if not repo.user_exists(connection, user_id):
+        raise HTTPException(http_status.HTTP_404_NOT_FOUND, "User not found")
+    if repo.user_count(connection) <= 1:
+        raise HTTPException(
+            http_status.HTTP_409_CONFLICT, "Cannot delete the last player"
+        )
+    owned, progress = repo.user_usage(connection, user_id)
+    if owned:
+        raise HTTPException(
+            http_status.HTTP_409_CONFLICT,
+            f"Player still has {owned} assigned item(s). Reassign or delete them first.",
+        )
+    if progress:
+        raise HTTPException(
+            http_status.HTTP_409_CONFLICT,
+            f"Player still has {progress} item(s) marked as done. Unmark them first.",
+        )
+    if not repo.delete_user(connection, user_id):
+        raise HTTPException(http_status.HTTP_404_NOT_FOUND, "User not found")
+
+
 def _must_get_item(connection: sqlite3.Connection, item_id: int) -> ItemOut:
     result = repo.get_item(connection, item_id, utc_now(), ResetConfig.from_env())
     if result is None:

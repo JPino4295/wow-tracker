@@ -98,11 +98,14 @@ def init_db(now: str) -> None:
                 "INTEGER REFERENCES users(id) ON DELETE SET NULL"
             )
 
-        for name in user_names():
-            connection.execute(
-                "INSERT OR IGNORE INTO users (name, created_at) VALUES (?, ?)",
-                (name, now),
-            )
+        # Seed defaults only for a brand-new database. Otherwise deleting a player
+        # would be undone on the next container restart.
+        if connection.execute("SELECT 1 FROM users LIMIT 1").fetchone() is None:
+            for name in user_names():
+                connection.execute(
+                    "INSERT OR IGNORE INTO users (name, created_at) VALUES (?, ?)",
+                    (name, now),
+                )
         connection.commit()
     finally:
         connection.close()

@@ -68,6 +68,27 @@ def rename_user(connection: sqlite3.Connection, user_id: int, name: str) -> bool
     return cursor.rowcount > 0
 
 
+def user_count(connection: sqlite3.Connection) -> int:
+    return int(connection.execute("SELECT COUNT(*) FROM users").fetchone()[0])
+
+
+def user_usage(connection: sqlite3.Connection, user_id: int) -> tuple[int, int]:
+    """Return (owned items, progress rows) referencing the player."""
+    owned = connection.execute(
+        "SELECT COUNT(*) FROM items WHERE owner_user_id = ?", (user_id,)
+    ).fetchone()[0]
+    progress = connection.execute(
+        "SELECT COUNT(*) FROM progress WHERE user_id = ?", (user_id,)
+    ).fetchone()[0]
+    return int(owned), int(progress)
+
+
+def delete_user(connection: sqlite3.Connection, user_id: int) -> bool:
+    cursor = connection.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    connection.commit()
+    return cursor.rowcount > 0
+
+
 def list_sources(connection: sqlite3.Connection) -> list[SourceOut]:
     rows = connection.execute(
         "SELECT id, name, kind, zone, wowhead_url FROM sources ORDER BY name"

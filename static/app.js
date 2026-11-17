@@ -150,6 +150,7 @@ async function loadMeta() {
   state.userId = state.users.some((entry) => entry.id === stored)
     ? stored
     : (state.users[0]?.id ?? null);
+  if (state.userId !== null) localStorage.setItem('wowtracker.user', String(state.userId));
   renderUserSelect();
   renderOwnerOptions();
   renderOwnerOptions($('edit-owner'));
@@ -448,10 +449,26 @@ function openEdit(item) {
   $('edit-dialog').showModal();
 }
 
+async function removeUser(entry) {
+  const message = `¿Eliminar a ${entry.name}?\n\n`
+    + 'Solo se permite si no es el último jugador y no tiene objetos asignados '
+    + 'ni progreso marcado. Desmarca esos objetos o reasígnalos antes.';
+  if (!window.confirm(message)) return;
+  try {
+    await api(`/api/users/${entry.id}`, { method: 'DELETE' });
+    $('settings-dialog').close();
+    await loadMeta();
+    await loadItems();
+  } catch (error) {
+    window.alert(error.message);
+  }
+}
+
 function openSettings() {
   const container = $('settings-users');
   container.replaceChildren();
   for (const entry of state.users) {
+    const row = el('div', 'user-row');
     const label = el('label', null, `Jugador ${entry.id}`);
     const input = el('input');
     input.type = 'text';
@@ -460,7 +477,19 @@ function openSettings() {
     input.maxLength = 100;
     input.required = true;
     label.append(input);
-    container.append(label);
+
+    const remove = el('button', 'icon-btn danger', '🗑');
+    remove.type = 'button';
+    remove.title = `Eliminar a ${entry.name}`;
+    remove.setAttribute('aria-label', `Eliminar a ${entry.name}`);
+    if (state.users.length <= 1) {
+      remove.disabled = true;
+      remove.title = 'No se puede eliminar al último jugador';
+    }
+    remove.addEventListener('click', () => removeUser(entry));
+
+    row.append(label, remove);
+    container.append(row);
   }
   $('settings-dialog').showModal();
 }

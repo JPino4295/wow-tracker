@@ -98,7 +98,7 @@ docker compose up -d --build
 | `DAILY_RESET_HOUR_UTC` | `7` | Hora UTC del reset diario |
 | `WEEKLY_RESET_WEEKDAY` | `2` | Día del reset semanal (0=lunes, 1=martes, 2=miércoles) |
 | `WEEKLY_RESET_HOUR_UTC` | `7` | Hora UTC del reset semanal |
-| `USER_1_NAME` / `USER_2_NAME` | `Jugador 1` / `Jugador 2` | Nombres iniciales (luego editables en la web) |
+| `USER_1_NAME` / `USER_2_NAME` | `Jugador 1` / `Jugador 2` | Nombres iniciales de una BD vacía (luego editables o eliminables en la web) |
 
 ---
 
@@ -124,6 +124,10 @@ algo no cambia el estado del otro jugador.
 ## 5. Uso de la interfaz
 
 - El **selector "Visto por"** elige qué jugador se ve; se recuerda en el navegador.
+- En **⚙** puedes renombrar jugadores y borrarlos con **🗑**. No se puede eliminar al
+  último jugador, ni a uno con objetos asignados («Para quién») o con progreso
+  marcado: reasígnalos o desmárcalos antes. Un jugador borrado no reaparece al
+  reiniciar el contenedor.
 - Los **filtros** (tipo, periodicidad, fuente, tipo de fuente, estado y texto) se
   combinan entre sí; el botón **Limpiar** los resetea.
 - Clic en una fila abre la **ficha**: descripción, relaciones N:M de fuentes con

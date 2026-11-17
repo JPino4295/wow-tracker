@@ -8,6 +8,7 @@ from typing import Any, Iterator
 import pytest
 from fastapi.testclient import TestClient
 
+from app.db import init_db
 from app.main import app
 
 UTC = timezone.utc
@@ -355,3 +356,46 @@ def test_sources_can_be_added_later_and_survive_unrelated_edits(
     assert link["source_id"] == source_id
     assert link["drop_rate"] == 15
     assert link["difficulty"] == "Mítico"
+
+
+def test_user_without_data_can_be_deleted_and_is_not_reseeded(
+    client: TestClient,
+) -> None:
+    users = client.get("/api/meta").json()["users"]
+    first, second = users[0]["id"], users[1]["id"]
+
+    deleted = client.delete(f"/api/users/{second}")
+    assert deleted.status_code == 204, deleted.text
+    assert [user["id"] for user in client.get("/api/meta").json()["users"]] == [first]
+
+    # Restarting the app must not bring the deleted default player back.
+    init_db("2026-11-17T08:00:00+00:00")
+    assert [user["id"] for user in client.get("/api/meta").json()["users"]] == [first]
+
+
+def test_user_deletion_is_blocked_when_last_or_still_referenced(
+    client: TestClient,
+) -> None:
+    users = client.get("/api/meta").json()["users"]
+    first, second = users[0]["id"], users[1]["id"]
+    item_id = client.post(
+        "/api/items", json={**mount_payload(), "owner_user_id": second}
+    ).json()["id"]
+
+    owned = client.delete(f"/api/users/{second}")
+    assert owned.status_code == 409, owned.text
+    assert "assigned item" in owned.json()["detail"]
+
+    client.patch(f"/api/items/{item_id}", json={"owner_user_id": None})
+    client.put(f"/api/items/{item_id}/progress?user_id={second}", json={"done": True})
+    with_progress = client.delete(f"/api/users/{second}")
+    assert with_progress.status_code == 409, with_progress.text
+    assert "marked as done" in with_progress.json()["detail"]
+
+    client.put(f"/api/items/{item_id}/progress?user_id={second}", json={"done": False})
+    assert client.delete(f"/api/users/{second}").status_code == 204
+
+    last = client.delete(f"/api/users/{first}")
+    assert last.status_code == 409, last.text
+    assert "last player" in last.json()["detail"]
+    assert client.delete("/api/users/9999").status_code == 404
