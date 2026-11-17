@@ -293,3 +293,34 @@ def test_drop_rate_can_be_edited_after_creation(client: TestClient, source_id: i
     assert link["drop_rate"] == 7.5
     assert link["difficulty"] == "Mítico"
     assert link["conditions"] == "Solo con la Rare activa"
+
+
+def test_item_can_be_edited_completely(client: TestClient) -> None:
+    second = client.get("/api/meta").json()["users"][1]["id"]
+    item_id = client.post("/api/items", json=mount_payload()).json()["id"]
+
+    patched = client.patch(
+        f"/api/items/{item_id}",
+        json={
+            "name": "Juguete editado",
+            "wowhead_id": 137541,
+            "url_wowhead": "https://www.wowhead.com/es/item=137541",
+            "type": "toy",
+            "periodicity": "daily",
+            "owner_user_id": second,
+            "icon_local": "juguete.png",
+            "description": "Descripción nueva",
+            "notes": "Notas nuevas",
+        },
+    )
+    assert patched.status_code == 200, patched.text
+    body = patched.json()
+    assert body["name"] == "Juguete editado"
+    assert body["wowhead_id"] == 137541
+    assert body["url_wowhead"] == "https://www.wowhead.com/es/item=137541"
+    assert body["type"] == "toy"
+    assert body["periodicity"] == "daily"
+    assert body["owner_user_id"] == second
+    assert body["icon_local"] == "juguete.png"
+    assert body["description"] == "Descripción nueva"
+    assert body["notes"] == "Notas nuevas"

@@ -155,6 +155,56 @@
       </form>
     </dialog>
 
+    <dialog id="edit-dialog" class="modal">
+      <button class="close" type="button" data-close aria-label="Cerrar edición">✕</button>
+      <h2>Editar objeto</h2>
+      <form id="edit-form">
+        <input type="hidden" name="item_id" />
+        <div class="form-grid">
+          <label class="span-2">Nombre *
+            <input name="name" required maxlength="200" />
+          </label>
+          <label>Wowhead ID
+            <input name="wowhead_id" type="number" min="1" />
+          </label>
+          <label>URL de Wowhead
+            <input name="url_wowhead" type="url" />
+          </label>
+          <label>Tipo *
+            <select name="type">
+              <option value="mount">Montura</option>
+              <option value="transmog">Transfiguración</option>
+              <option value="toy">Juguete</option>
+              <option value="pet">Mascota</option>
+              <option value="other">Otros</option>
+            </select>
+          </label>
+          <label>Periodicidad *
+            <select name="periodicity">
+              <option value="weekly">Semanal</option>
+              <option value="daily">Diaria</option>
+            </select>
+          </label>
+          <label>Para quién
+            <select name="owner_user_id" id="edit-owner"><option value="">Ambos</option></select>
+          </label>
+          <label class="span-2">Icono local (nombre de archivo en data/images o URL)
+            <input name="icon_local" />
+          </label>
+          <label class="span-2">Descripción
+            <textarea name="description" rows="2"></textarea>
+          </label>
+          <label class="span-2">Notas
+            <textarea name="notes" rows="2"></textarea>
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button class="ghost" type="button" data-close>Cancelar</button>
+          <button class="primary" type="submit">Guardar cambios</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="settings-dialog" class="modal">
       <button class="close" type="button" data-close aria-label="Cerrar ajustes">✕</button>
       <h2>Nombres de jugadores</h2>

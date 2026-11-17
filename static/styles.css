@@ -183,6 +183,7 @@ button:disabled, input:disabled, textarea:disabled, select:disabled {
 
 .detail-head { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; }
 .detail-head h2 { margin: 0; overflow-wrap: anywhere; }
+.detail-actions { display: flex; justify-content: flex-end; margin: -.35rem 0 .9rem; }
 .detail-section { border-top: 1px solid var(--border); padding-top: .9rem; margin-top: .9rem; }
 .detail-section h3 { font-size: .85rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .source-row { padding: .5rem 0; border-bottom: 1px solid var(--border); font-size: .9rem; }

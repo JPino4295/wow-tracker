@@ -88,8 +88,7 @@ function renderUserSelect() {
   select.value = String(state.userId);
 }
 
-function renderOwnerOptions() {
-  const select = $('add-owner');
+function renderOwnerOptions(select = $('add-owner')) {
   select.replaceChildren();
   const both = el('option', null, 'Ambos');
   both.value = '';
@@ -140,6 +139,7 @@ async function loadMeta() {
     : (state.users[0]?.id ?? null);
   renderUserSelect();
   renderOwnerOptions();
+  renderOwnerOptions($('edit-owner'));
 
   const day = WEEKDAYS[state.meta.weekly_weekday] || 'martes';
   const pad = (hour) => String(hour).padStart(2, '0');
@@ -266,6 +266,15 @@ function openDetail(id) {
   titles.append(badges);
   head.append(icon(item.icon_local, true), titles);
   body.append(head);
+
+  if (!foreign) {
+    const editBar = el('div', 'detail-actions');
+    const editButton = el('button', 'ghost', '✎ Editar');
+    editButton.type = 'button';
+    editButton.addEventListener('click', () => openEdit(item));
+    editBar.append(editButton);
+    body.append(editBar);
+  }
 
   if (item.description) {
     const section = el('div', 'detail-section');
@@ -409,6 +418,22 @@ function openDetail(id) {
   if (!dialog.open) dialog.showModal();
 }
 
+function openEdit(item) {
+  const form = $('edit-form');
+  form.elements['item_id'].value = String(item.id);
+  form.elements['name'].value = item.name || '';
+  form.elements['wowhead_id'].value = item.wowhead_id === null ? '' : String(item.wowhead_id);
+  form.elements['url_wowhead'].value = item.url_wowhead || '';
+  form.elements['type'].value = item.type;
+  form.elements['periodicity'].value = item.periodicity;
+  form.elements['owner_user_id'].value =
+    item.owner_user_id === null ? '' : String(item.owner_user_id);
+  form.elements['icon_local'].value = item.icon_local || '';
+  form.elements['description'].value = item.description || '';
+  form.elements['notes'].value = item.notes || '';
+  $('edit-dialog').showModal();
+}
+
 function openSettings() {
   const container = $('settings-users');
   container.replaceChildren();
@@ -483,6 +508,36 @@ function bindEvents() {
       form.reset();
       $('add-dialog').close();
       await loadItems();
+    } catch (error) {
+      window.alert(error.message);
+    }
+  });
+
+  $('edit-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const itemId = Number(data.get('item_id'));
+    const wowheadId = data.get('wowhead_id') ? Number(data.get('wowhead_id')) : null;
+    const payload = {
+      name: data.get('name'),
+      wowhead_id: wowheadId,
+      url_wowhead: data.get('url_wowhead')
+        || (wowheadId ? `https://www.wowhead.com/es/item=${wowheadId}` : ''),
+      type: data.get('type'),
+      periodicity: data.get('periodicity'),
+      owner_user_id: data.get('owner_user_id') ? Number(data.get('owner_user_id')) : null,
+      icon_local: data.get('icon_local') || '',
+      description: data.get('description') || '',
+      notes: data.get('notes') || '',
+    };
+    try {
+      const updated = await api(`/api/items/${itemId}`, jsonOptions('PATCH', payload));
+      const index = state.items.findIndex((entry) => entry.id === itemId);
+      if (index !== -1) state.items[index] = updated;
+      $('edit-dialog').close();
+      renderItems();
+      openDetail(itemId);
     } catch (error) {
       window.alert(error.message);
     }

@@ -136,6 +136,9 @@ algo no cambia el estado del otro jugador.
   fuente, se puede crear desde el propio formulario. El icono local se guarda como
   nombre de archivo en `data/images/` y se sirve desde `/media/<nombre>` (también
   admite URL).
+- El botón **✎ Editar** de la ficha abre el formulario completo para cambiar nombre,
+  Wowhead ID/URL, tipo, periodicidad, «Para quién», icono, descripción y notas. Las
+  fuentes y su drop rate/dificultad/condiciones se siguen editando en la propia ficha.
 - Los objetos asignados a otro jugador **siguen apareciendo en el listado**, pero se
   muestran atenuados con la etiqueta «Solo para X». Su ficha es de **solo lectura**:
   no se pueden editar drop rate/dificultad/condiciones ni notas, y el botón de
