@@ -74,7 +74,12 @@ def is_done(
     periodicity: str,
     config: ResetConfig | None = None,
 ) -> bool:
-    """A progress record counts as done only inside the current period."""
+    """A progress record counts as done only inside the current period.
+
+    One-time items stay done for as long as a completion is recorded.
+    """
     if not last_done_at:
         return False
+    if periodicity == "once":
+        return True
     return parse_timestamp(last_done_at) >= period_start(now, periodicity, config)
