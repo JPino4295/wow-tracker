@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Iterator
 
 import pytest
@@ -59,6 +61,162 @@ def test_health_and_meta_expose_two_users_and_reset_config(client: TestClient) -
     assert meta["daily_hour_utc"] == 7
     assert meta["weekly_weekday"] == 2
     assert meta["weekly_hour_utc"] == 7
+
+
+def test_secret_source_can_be_created_and_listed(client: TestClient) -> None:
+    created = client.post(
+        "/api/sources",
+        json={
+            "name": "Cofre de secreto",
+            "kind": "secret",
+            "zone": "Isla de los Truenos",
+            "wowhead_url": "https://www.wowhead.com/es/object=123456",
+        },
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["name"] == "Cofre de secreto"
+    assert body["kind"] == "secret"
+
+    listed = client.get("/api/sources").json()
+    assert [source["id"] for source in listed] == [body["id"]]
+    assert listed[0]["kind"] == "secret"
+
+
+def test_one_time_item_can_be_created_and_read_without_a_next_reset(
+    client: TestClient,
+) -> None:
+    created = client.post("/api/items", json={**mount_payload(), "periodicity": "once"})
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["periodicity"] == "once"
+    assert body["next_reset_at"] == ""
+
+    detail = client.get(f"/api/items/{body['id']}").json()
+    assert detail["periodicity"] == "once"
+    assert detail["next_reset_at"] == ""
+
+
+def test_secret_source_attachment_makes_item_one_time(client: TestClient) -> None:
+    secret = client.post(
+        "/api/sources", json={"name": "Cofre de secreto", "kind": "secret"}
+    ).json()
+
+    created = client.post(
+        "/api/items",
+        json={**mount_payload(), "sources": [{"source_id": secret["id"]}]},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["periodicity"] == "once"
+
+    weekly = client.post(
+        "/api/items",
+        json={**mount_payload(), "name": "Otro objeto", "wowhead_id": 137540},
+    ).json()
+    assert weekly["periodicity"] == "weekly"
+
+    patched = client.patch(
+        f"/api/items/{weekly['id']}",
+        json={
+            "sources": [
+                {
+                    "source_id": secret["id"],
+                    "drop_rate": None,
+                    "difficulty": "",
+                    "conditions": "",
+                }
+            ]
+        },
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["periodicity"] == "once"
+
+
+def test_once_progress_survives_daily_and_weekly_resets_and_is_per_player(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secret = client.post(
+        "/api/sources", json={"name": "Cofre de secreto", "kind": "secret"}
+    ).json()
+    once_id = client.post(
+        "/api/items",
+        json={
+            **mount_payload(),
+            "sources": [
+                {
+                    "source_id": secret["id"],
+                    "drop_rate": None,
+                    "difficulty": "",
+                    "conditions": "",
+                }
+            ],
+        },
+    ).json()["id"]
+    weekly_id = client.post(
+        "/api/items",
+        json={**mount_payload(), "name": "Objeto semanal", "wowhead_id": 137540},
+    ).json()["id"]
+    first, second = [user["id"] for user in client.get("/api/meta").json()["users"]]
+
+    moment = datetime(2026, 11, 18, 12, 0, tzinfo=UTC)
+    monkeypatch.setattr("app.main.utc_now", lambda: moment)
+    monkeypatch.setattr("app.repository.utc_now", lambda: moment)
+    client.put(f"/api/items/{once_id}/progress?user_id={first}", json={"done": True})
+    client.put(f"/api/items/{weekly_id}/progress?user_id={first}", json={"done": True})
+
+    # Well past the next daily and weekly resets.
+    later = datetime(2026, 11, 26, 12, 0, tzinfo=UTC)
+    monkeypatch.setattr("app.main.utc_now", lambda: later)
+    monkeypatch.setattr("app.repository.utc_now", lambda: later)
+
+    once = client.get(f"/api/items/{once_id}").json()
+    assert once["progress"][str(first)]["done"] is True
+    assert once["progress"][str(second)]["done"] is False
+    weekly = client.get(f"/api/items/{weekly_id}").json()
+    assert weekly["progress"][str(first)]["done"] is False
+
+
+def test_removing_last_secret_source_keeps_once_until_periodicity_is_edited(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    secret = client.post(
+        "/api/sources", json={"name": "Cofre de secreto", "kind": "secret"}
+    ).json()
+    item_id = client.post(
+        "/api/items",
+        json={
+            **mount_payload(),
+            "sources": [
+                {
+                    "source_id": secret["id"],
+                    "drop_rate": None,
+                    "difficulty": "",
+                    "conditions": "",
+                }
+            ],
+        },
+    ).json()["id"]
+    user_id = client.get("/api/meta").json()["users"][0]["id"]
+
+    moment = datetime(2026, 11, 18, 12, 0, tzinfo=UTC)
+    monkeypatch.setattr("app.main.utc_now", lambda: moment)
+    monkeypatch.setattr("app.repository.utc_now", lambda: moment)
+    client.put(f"/api/items/{item_id}/progress?user_id={user_id}", json={"done": True})
+
+    removed = client.patch(f"/api/items/{item_id}", json={"sources": []})
+    assert removed.status_code == 200, removed.text
+    assert removed.json()["periodicity"] == "once"
+    assert removed.json()["next_reset_at"] == ""
+
+    later = datetime(2026, 11, 26, 12, 0, tzinfo=UTC)
+    monkeypatch.setattr("app.main.utc_now", lambda: later)
+    monkeypatch.setattr("app.repository.utc_now", lambda: later)
+    assert client.get(f"/api/items/{item_id}").json()["progress"][str(user_id)]["done"] is True
+
+    edited = client.patch(f"/api/items/{item_id}", json={"periodicity": "weekly"})
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["periodicity"] == "weekly"
+    assert edited.json()["next_reset_at"] != ""
 
 
 def test_item_with_source_is_created_and_url_is_generated(
@@ -397,6 +555,104 @@ def test_user_can_be_created_with_a_unique_non_blank_name(
     )
     assert item.status_code == 201, item.text
     assert item.json()["owner_user_id"] == new_id
+
+
+def test_existing_daily_weekly_contract_progress_and_auth_are_unchanged(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db_file = Path(tmp_path) / "legacy.db"
+    monkeypatch.setenv("DB_PATH", str(db_file))
+    monkeypatch.setenv("DATA_DIR", str(Path(tmp_path) / "data"))
+
+    connection = sqlite3.connect(db_file)
+    connection.executescript(
+        """
+        CREATE TABLE users (
+            id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL
+        );
+        CREATE TABLE items (
+            id INTEGER PRIMARY KEY, wowhead_id INTEGER UNIQUE, name TEXT NOT NULL,
+            type TEXT NOT NULL CHECK (type IN ('mount','transmog','toy','pet','other')),
+            icon_local TEXT NOT NULL DEFAULT '',
+            periodicity TEXT NOT NULL CHECK (periodicity IN ('daily','weekly')),
+            owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            url_wowhead TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '', last_scraped_at TEXT,
+            created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+        );
+        CREATE TABLE sources (
+            id INTEGER PRIMARY KEY, name TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('raid','rare','boss')),
+            zone TEXT NOT NULL DEFAULT '', wowhead_url TEXT NOT NULL DEFAULT '',
+            UNIQUE (name, kind)
+        );
+        CREATE TABLE item_sources (
+            item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+            drop_rate REAL CHECK (drop_rate IS NULL OR (drop_rate >= 0 AND drop_rate <= 100)),
+            difficulty TEXT NOT NULL DEFAULT '', conditions TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (item_id, source_id, difficulty)
+        );
+        CREATE TABLE progress (
+            item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            last_done_at TEXT NOT NULL, PRIMARY KEY (item_id, user_id)
+        );
+        INSERT INTO users VALUES (1, 'Ana', '2026-01-01');
+        INSERT INTO users VALUES (2, 'Beto', '2026-01-01');
+        INSERT INTO sources VALUES (1, 'Sagrario', 'raid', 'Sagrario', 'https://example.com');
+        INSERT INTO items (id, name, type, periodicity, owner_user_id, created_at, updated_at)
+          VALUES (1, 'Montura semanal', 'mount', 'weekly', NULL, '2026-01-01', '2026-01-01');
+        INSERT INTO items (id, name, type, periodicity, owner_user_id, created_at, updated_at)
+          VALUES (2, 'Juguete diario', 'toy', 'daily', 2, '2026-01-01', '2026-01-01');
+        INSERT INTO item_sources (item_id, source_id, drop_rate, difficulty, conditions)
+          VALUES (1, 1, 12.5, 'Mítico', 'Rare');
+        INSERT INTO progress VALUES (1, 1, '2026-11-17T08:00:00+00:00');
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    moment = datetime(2026, 11, 17, 12, 0, tzinfo=UTC)
+    monkeypatch.setattr("app.main.utc_now", lambda: moment)
+    monkeypatch.setattr("app.repository.utc_now", lambda: moment)
+
+    with TestClient(app) as legacy_client:
+        by_id = {item["id"]: item for item in legacy_client.get("/api/items").json()}
+        assert set(by_id) == {1, 2}
+        assert by_id[1]["name"] == "Montura semanal"
+        assert by_id[1]["periodicity"] == "weekly"
+        assert by_id[1]["sources"][0]["source_kind"] == "raid"
+        assert by_id[2]["periodicity"] == "daily"
+        assert by_id[2]["owner_user_id"] == 2
+        assert by_id[1]["progress"]["1"]["done"] is True
+        assert by_id[1]["progress"]["2"]["done"] is False
+
+        assert [i["id"] for i in legacy_client.get("/api/items?periodicity=weekly").json()] == [1]
+        assert [i["id"] for i in legacy_client.get("/api/items?source_kind=raid").json()] == [1]
+        done = legacy_client.get("/api/items?status=done&user_id=1").json()
+        assert [item["id"] for item in done] == [1]
+
+        forbidden = legacy_client.put(
+            "/api/items/2/progress?user_id=1", json={"done": True}
+        )
+        assert forbidden.status_code == 403
+
+        patched = legacy_client.patch("/api/items/1", json={"notes": "Nota nueva"})
+        assert patched.status_code == 200
+        assert patched.json()["notes"] == "Nota nueva"
+
+        after = datetime(2026, 11, 18, 7, 30, tzinfo=UTC)
+        monkeypatch.setattr("app.main.utc_now", lambda: after)
+        assert legacy_client.get("/api/items/1").json()["progress"]["1"]["done"] is False
+
+        assert legacy_client.post(
+            "/api/items", json={**mount_payload(), "type": "wrong"}
+        ).status_code == 422
+        assert legacy_client.post(
+            "/api/items",
+            json={**mount_payload(), "sources": [{"source_id": 9999}]},
+        ).status_code == 400
 
 
 def test_user_deletion_is_blocked_when_last_or_still_referenced(

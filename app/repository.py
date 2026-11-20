@@ -157,6 +157,11 @@ def _item_out(
             last_done_at=record["last_done_at"],
         )
 
+    if row["periodicity"] == "once":
+        next_reset_at = ""
+    else:
+        next_reset_at = next_reset(now, row["periodicity"], config).isoformat()
+
     return ItemOut(
         id=row["id"],
         wowhead_id=row["wowhead_id"],
@@ -171,7 +176,7 @@ def _item_out(
         last_scraped_at=row["last_scraped_at"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
-        next_reset_at=next_reset(now, row["periodicity"], config).isoformat(),
+        next_reset_at=next_reset_at,
         sources=_source_links(connection, row["id"]),
         progress=progress,
     )
@@ -214,6 +219,21 @@ def _check_source_ids(
             raise ValueError(f"Unknown source id: {source_id}")
 
 
+def _has_secret_source(
+    connection: sqlite3.Connection, source_ids: list[int]
+) -> bool:
+    if not source_ids:
+        return False
+    placeholders = ", ".join("?" for _ in source_ids)
+    return (
+        connection.execute(
+            f"SELECT 1 FROM sources WHERE kind = 'secret' AND id IN ({placeholders}) LIMIT 1",
+            source_ids,
+        ).fetchone()
+        is not None
+    )
+
+
 def _check_owner(connection: sqlite3.Connection, owner_user_id: int | None) -> None:
     if owner_user_id is None:
         return
@@ -223,9 +243,12 @@ def _check_owner(connection: sqlite3.Connection, owner_user_id: int | None) -> N
 
 def create_item(connection: sqlite3.Connection, payload: ItemCreate) -> int:
     """Insert an item and its source relations in one transaction."""
-    _check_source_ids(connection, [link.source_id for link in payload.sources])
+    source_ids = [link.source_id for link in payload.sources]
+    _check_source_ids(connection, source_ids)
     _check_owner(connection, payload.owner_user_id)
     data = payload.model_dump(exclude={"sources"})
+    if _has_secret_source(connection, source_ids):
+        data["periodicity"] = "once"
     now = timestamp()
     columns = [*ITEM_WRITABLE_COLUMNS, "created_at", "updated_at"]
     values = [
@@ -255,7 +278,10 @@ def update_item(
     data = payload.model_dump(exclude_unset=True)
     links = data.pop("sources", None)
     if links is not None:
-        _check_source_ids(connection, [link["source_id"] for link in links])
+        source_ids = [link["source_id"] for link in links]
+        _check_source_ids(connection, source_ids)
+        if _has_secret_source(connection, source_ids):
+            data["periodicity"] = "once"
     if "owner_user_id" in data:
         _check_owner(connection, data["owner_user_id"])
 

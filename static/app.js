@@ -7,8 +7,8 @@ const TYPE_LABELS = {
   pet: 'Mascota',
   other: 'Otros',
 };
-const KIND_LABELS = { raid: 'Raid', rare: 'Rare', boss: 'Boss' };
-const PERIOD_LABELS = { daily: 'Diaria', weekly: 'Semanal' };
+const KIND_LABELS = { raid: 'Raid', rare: 'Rare', boss: 'Boss', secret: 'Secreto' };
+const PERIOD_LABELS = { daily: 'Diaria', weekly: 'Semanal', once: 'Una vez' };
 const WEEKDAYS = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
 
 const state = { users: [], sources: [], items: [], userId: null, meta: null };

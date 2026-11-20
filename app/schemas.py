@@ -19,12 +19,14 @@ class ItemType(str, Enum):
 class Periodicity(str, Enum):
     daily = "daily"
     weekly = "weekly"
+    once = "once"
 
 
 class SourceKind(str, Enum):
     raid = "raid"
     rare = "rare"
     boss = "boss"
+    secret = "secret"
 
 
 def _http_url(value: str) -> str:
