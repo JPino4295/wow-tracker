@@ -27,7 +27,7 @@ _ITEMS_COLUMNS = """
 _SOURCES_COLUMNS = """
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL,
-    kind        TEXT NOT NULL CHECK (kind IN ('raid','rare','boss','secret')),
+    kind        TEXT NOT NULL CHECK (kind IN ('raid','rare','boss','secret','farming')),
     zone        TEXT NOT NULL DEFAULT '',
     wowhead_url TEXT NOT NULL DEFAULT '',
     UNIQUE (name, kind)
@@ -103,7 +103,7 @@ def _rebuild_checks(connection: sqlite3.Connection) -> None:
         ),
         (
             "sources",
-            "secret",
+            "farming",
             _SOURCES_COLUMNS,
             ("id", "name", "kind", "zone", "wowhead_url"),
             (),
