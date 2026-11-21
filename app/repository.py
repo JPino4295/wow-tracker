@@ -5,7 +5,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from .config import ResetConfig
 from .resets import is_done, next_reset, utc_now
@@ -148,6 +148,8 @@ def update_source(
         "SELECT id, name, kind, zone, wowhead_url FROM sources WHERE id = ?",
         (source_id,),
     ).fetchone()
+    if row is None:
+        return None
     return SourceOut(**dict(row))
 
 
@@ -166,10 +168,27 @@ def source_usage(connection: sqlite3.Connection, source_id: int) -> int:
     )
 
 
-def delete_source(connection: sqlite3.Connection, source_id: int) -> bool:
-    cursor = connection.execute("DELETE FROM sources WHERE id = ?", (source_id,))
-    connection.commit()
-    return cursor.rowcount > 0
+SourceDeleteOutcome = Literal["deleted", "missing", "in_use"]
+
+
+def delete_source(
+    connection: sqlite3.Connection, source_id: int
+) -> SourceDeleteOutcome:
+    """Delete an unused source with the usage guard inside one write transaction."""
+    connection.execute("BEGIN IMMEDIATE")
+    try:
+        if not source_exists(connection, source_id):
+            connection.rollback()
+            return "missing"
+        if source_usage(connection, source_id):
+            connection.rollback()
+            return "in_use"
+        connection.execute("DELETE FROM sources WHERE id = ?", (source_id,))
+        connection.commit()
+        return "deleted"
+    except Exception:
+        connection.rollback()
+        raise
 
 
 def _source_links(

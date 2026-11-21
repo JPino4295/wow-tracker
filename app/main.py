@@ -120,14 +120,13 @@ def remove_source(
     source_id: int,
     connection: sqlite3.Connection = Depends(get_connection),
 ) -> None:
-    if not repo.source_exists(connection, source_id):
-        raise HTTPException(http_status.HTTP_404_NOT_FOUND, "Source not found")
-    if repo.source_usage(connection, source_id):
+    outcome = repo.delete_source(connection, source_id)
+    if outcome == "in_use":
         raise HTTPException(
             http_status.HTTP_409_CONFLICT,
             "Source is still used by items. Unlink or delete them first.",
         )
-    if not repo.delete_source(connection, source_id):
+    if outcome == "missing":
         raise HTTPException(http_status.HTTP_404_NOT_FOUND, "Source not found")
 
 
