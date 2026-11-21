@@ -11,7 +11,9 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from app.db import init_db
+from app import repository as repo
+from app.config import db_path
+from app.db import connect, init_db
 from app.main import app
 
 
@@ -418,6 +420,113 @@ def test_delete_used_source_returns_409_and_keeps_links(client: TestClient) -> N
     assert client.get(f"/api/items/{item_id}").json() == before
     assert before["sources"][0]["source_id"] == source["id"]
     assert before["sources"][0]["source_kind"] == "raid"
+
+
+def test_delete_source_racing_with_a_new_link_returns_409_and_keeps_the_link(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = client.post("/api/sources", json={"name": "Sagrario", "kind": "raid"}).json()
+    other = client.post("/api/sources", json={"name": "Ruta vieja", "kind": "boss"}).json()
+    item_id = client.post("/api/items", json=mount_payload()).json()["id"]
+    real_delete = repo.delete_source
+
+    def delete_with_late_link(connection: sqlite3.Connection, source_id: int) -> Any:
+        competing = connect()
+        try:
+            competing.execute(
+                """
+                INSERT INTO item_sources (item_id, source_id, drop_rate, difficulty, conditions)
+                VALUES (?, ?, NULL, '', '')
+                """,
+                (item_id, source_id),
+            )
+            competing.commit()
+        finally:
+            competing.close()
+        return real_delete(connection, source_id)
+
+    monkeypatch.setattr("app.main.repo.delete_source", delete_with_late_link)
+    deleted = client.delete(f"/api/sources/{source['id']}")
+
+    assert deleted.status_code == 409, deleted.text
+    assert {entry["id"] for entry in client.get("/api/sources").json()} == {
+        source["id"],
+        other["id"],
+    }
+    links = client.get(f"/api/items/{item_id}").json()["sources"]
+    assert [link["source_id"] for link in links] == [source["id"]]
+
+
+def test_delete_source_locks_out_a_concurrent_delete_between_guard_and_delete(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = client.post("/api/sources", json={"name": "Sagrario", "kind": "raid"}).json()
+    other = client.post("/api/sources", json={"name": "Ruta vieja", "kind": "boss"}).json()
+    item_id = client.post("/api/items", json=mount_payload()).json()["id"]
+    client.patch(f"/api/items/{item_id}", json={"sources": [{"source_id": other["id"]}]})
+    before = client.get(f"/api/items/{item_id}").json()
+    blocked: list[bool] = []
+
+    def connect_with_competing_delete() -> sqlite3.Connection:
+        connection = connect()
+
+        def trace(sql: str) -> None:
+            if "FROM sources WHERE id =" not in sql or blocked:
+                return
+            competing = sqlite3.connect(db_path(), timeout=0.01)
+            try:
+                competing.execute("DELETE FROM sources WHERE id = ?", (source["id"],))
+                competing.commit()
+            except sqlite3.OperationalError as err:
+                blocked.append("locked" in str(err))
+            else:
+                blocked.append(False)
+            finally:
+                competing.close()
+
+        connection.set_trace_callback(trace)
+        return connection
+
+    monkeypatch.setattr("app.db.connect", connect_with_competing_delete)
+    deleted = client.delete(f"/api/sources/{source['id']}")
+
+    assert deleted.status_code == 204, deleted.text
+    assert blocked == [True]
+    assert {entry["id"] for entry in client.get("/api/sources").json()} == {other["id"]}
+    assert client.get(f"/api/items/{item_id}").json() == before
+
+
+def test_patch_source_deleted_between_select_and_reread_returns_404(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = client.post("/api/sources", json={"name": "Sagrario", "kind": "raid"}).json()
+    selects = 0
+
+    def connect_with_concurrent_delete() -> sqlite3.Connection:
+        connection = connect()
+
+        def trace(sql: str) -> None:
+            nonlocal selects
+            if "FROM sources WHERE id =" not in sql:
+                return
+            selects += 1
+            if selects == 2:
+                competing = connect()
+                try:
+                    competing.execute("DELETE FROM sources WHERE id = ?", (source["id"],))
+                    competing.commit()
+                finally:
+                    competing.close()
+
+        connection.set_trace_callback(trace)
+        return connection
+
+    monkeypatch.setattr("app.db.connect", connect_with_concurrent_delete)
+
+    patched = client.patch(f"/api/sources/{source['id']}", json={"zone": "Torgasta"})
+
+    assert patched.status_code == 404, patched.text
+    assert client.get("/api/sources").json() == []
 
 
 def test_existing_source_and_item_routes_are_unchanged_after_source_changes(
