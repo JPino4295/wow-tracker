@@ -198,3 +198,79 @@ def test_source_schema_with_secret_migrates_to_five_kinds(
     with pytest.raises(sqlite3.IntegrityError):
         connection.execute("INSERT INTO sources (name, kind) VALUES ('Mal', 'wrong')")
     connection.close()
+
+
+@pytest.mark.parametrize(
+    "source_kinds",
+    [
+        "'raid','rare','boss'",
+        "'raid','rare','boss','secret'",
+        "'raid','rare','boss','secret','farming'",
+    ],
+    ids=["three-kinds", "four-kinds", "five-kinds"],
+)
+def test_source_check_migration_accepts_dungeon_from_three_four_and_five_kind_schemas(
+    tmp_path: Any, monkeypatch: Any, source_kinds: str
+) -> None:
+    db_file = Path(tmp_path) / "legacy.db"
+    monkeypatch.setenv("DB_PATH", str(db_file))
+    monkeypatch.setenv("DATA_DIR", str(Path(tmp_path) / "data"))
+
+    connection = sqlite3.connect(db_file)
+    connection.executescript(
+        f"""
+        CREATE TABLE items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            wowhead_id INTEGER UNIQUE,
+            name TEXT NOT NULL,
+            type TEXT NOT NULL,
+            icon_local TEXT NOT NULL DEFAULT '',
+            periodicity TEXT NOT NULL CHECK (periodicity IN ('daily','weekly','once')),
+            owner_user_id INTEGER,
+            url_wowhead TEXT NOT NULL DEFAULT '',
+            description TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
+            last_scraped_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE TABLE sources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ({source_kinds})),
+            zone TEXT NOT NULL DEFAULT '',
+            wowhead_url TEXT NOT NULL DEFAULT '',
+            UNIQUE (name, kind)
+        );
+        CREATE TABLE item_sources (
+            item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+            source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+            drop_rate REAL,
+            difficulty TEXT NOT NULL DEFAULT '',
+            conditions TEXT NOT NULL DEFAULT '',
+            PRIMARY KEY (item_id, source_id, difficulty)
+        );
+        INSERT INTO items (id, name, type, periodicity, created_at, updated_at)
+          VALUES (1, 'Montura', 'mount', 'weekly', '2026-01-01', '2026-01-01');
+        INSERT INTO sources VALUES (1, 'Sagrario', 'raid', 'Sagrario', 'https://example.com');
+        INSERT INTO item_sources (item_id, source_id, drop_rate, difficulty, conditions)
+          VALUES (1, 1, 12.5, 'Mítico', 'Rare');
+        """
+    )
+    connection.commit()
+    connection.close()
+
+    init_db(UTC_NOW)
+    init_db(UTC_NOW)
+
+    connection = sqlite3.connect(db_file)
+    assert connection.execute("SELECT id, name, kind FROM sources").fetchall() == [
+        (1, "Sagrario", "raid")
+    ]
+    assert connection.execute(
+        "SELECT item_id, source_id, drop_rate, difficulty, conditions FROM item_sources"
+    ).fetchall() == [(1, 1, 12.5, "Mítico", "Rare")]
+    connection.execute("INSERT INTO sources (name, kind) VALUES ('Mazmorra', 'dungeon')")
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute("INSERT INTO sources (name, kind) VALUES ('Mal', 'wrong')")
+    connection.close()

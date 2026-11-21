@@ -685,6 +685,60 @@ def test_farming_source_does_not_force_once(client: TestClient) -> None:
     assert secret_patch.json()["periodicity"] == "once"
 
 
+def test_dungeon_source_does_not_force_once_but_secret_still_forces_once(
+    client: TestClient,
+) -> None:
+    dungeon = client.post(
+        "/api/sources", json={"name": "Mazmorra", "kind": "dungeon"}
+    ).json()
+    secret = client.post(
+        "/api/sources", json={"name": "Cofre de secreto", "kind": "secret"}
+    ).json()
+
+    created = client.post(
+        "/api/items",
+        json={**mount_payload(), "sources": [{"source_id": dungeon["id"]}]},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["periodicity"] == "weekly"
+
+    weekly = client.post(
+        "/api/items",
+        json={**mount_payload(), "name": "Otro objeto", "wowhead_id": 137542},
+    ).json()
+    patched = client.patch(
+        f"/api/items/{weekly['id']}",
+        json={
+            "sources": [
+                {
+                    "source_id": dungeon["id"],
+                    "drop_rate": None,
+                    "difficulty": "",
+                    "conditions": "",
+                }
+            ]
+        },
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["periodicity"] == "weekly"
+
+    secret_patch = client.patch(
+        f"/api/items/{weekly['id']}",
+        json={
+            "sources": [
+                {
+                    "source_id": secret["id"],
+                    "drop_rate": None,
+                    "difficulty": "",
+                    "conditions": "",
+                }
+            ]
+        },
+    )
+    assert secret_patch.status_code == 200, secret_patch.text
+    assert secret_patch.json()["periodicity"] == "once"
+
+
 def test_owner_assignment_is_persisted_and_validation_rejects_unknown_users(
     client: TestClient,
 ) -> None:
@@ -1184,3 +1238,48 @@ def test_foreign_items_are_listed_last_with_combined_filters(
         "Riendas B ajena",
         "Riendas D ajena",
     ]
+
+
+@pytest.mark.parametrize(
+    "kind", ["raid", "rare", "boss", "secret", "farming", "dungeon"]
+)
+def test_dungeon_source_create_filter_patch_and_api_parity(
+    client: TestClient, kind: str
+) -> None:
+    created = client.post(
+        "/api/sources",
+        json={
+            "name": f"Fuente {kind}",
+            "kind": kind,
+            "zone": "Zona",
+            "wowhead_url": "https://www.wowhead.com/es/zone=1",
+        },
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["kind"] == kind
+    assert set(body) == {"id", "name", "kind", "zone", "wowhead_url"}
+
+    assert [source["id"] for source in client.get("/api/sources").json()] == [body["id"]]
+
+    item = client.post(
+        "/api/items",
+        json={**mount_payload(), "sources": [{"source_id": body["id"]}]},
+    )
+    assert item.status_code == 201, item.text
+    filtered = client.get(f"/api/items?source_kind={kind}").json()
+    assert [entry["name"] for entry in filtered] == ["Riendas de la venganza"]
+    assert filtered[0]["sources"][0]["source_kind"] == kind
+
+    duplicate = client.post("/api/sources", json={"name": f"Fuente {kind}", "kind": kind})
+    assert duplicate.status_code == 409
+    assert set(duplicate.json()) == {"detail"}
+
+    invalid = client.post("/api/sources", json={"name": "Mal", "kind": "wrong"})
+    assert invalid.status_code == 422
+    assert set(invalid.json()) == {"detail"}
+    assert invalid.json()["detail"][0]["loc"][-1] == "kind"
+
+    patched = client.patch(f"/api/sources/{body['id']}", json={"kind": "dungeon"})
+    assert patched.status_code == 200, patched.text
+    assert patched.json() == {**body, "kind": "dungeon"}
