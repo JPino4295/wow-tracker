@@ -175,12 +175,10 @@ function renderSourceList() {
     const edit = el('button', 'ghost small', '✎ Editar');
     edit.type = 'button';
     edit.id = `source-edit-${source.id}`;
-    edit.setAttribute('aria-label', `Editar ${source.name}`);
     edit.addEventListener('click', (event) => openSourceForm(event.currentTarget, source));
     const remove = el('button', 'ghost small danger', '🗑 Borrar');
     remove.type = 'button';
     remove.id = `source-delete-${source.id}`;
-    remove.setAttribute('aria-label', `Borrar ${source.name}`);
     remove.addEventListener('click', () => deleteSource(source));
     actions.append(edit, remove);
     card.append(actions);
