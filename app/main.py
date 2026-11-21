@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status as http_status
+from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import status as http_status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -168,9 +169,7 @@ def items(
             done = item.progress.get(key, ProgressOut(done=False, last_done_at=None)).done
             if done != (status == "done"):
                 return False
-        if q and q.strip().lower() not in f"{item.name} {item.description}".lower():
-            return False
-        return True
+        return not (q and q.strip().lower() not in f"{item.name} {item.description}".lower())
 
     return [item for item in result if matches(item)]
 

@@ -5,3 +5,8 @@ addopts = "-q"
 [tool.ruff]
 line-length = 100
 target-version = "py314"
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI resolves Depends()/Query() from function defaults; calling them there is
+# the framework's dependency-injection idiom, not a mutable-default bug.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]

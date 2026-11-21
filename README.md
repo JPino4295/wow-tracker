@@ -53,6 +53,15 @@ Tests:
 python -m pytest                            # Linux / macOS
 ```
 
+Lint y typecheck (instalados con `requirements-dev.txt`):
+
+```bash
+.\.venv\Scripts\python.exe -m ruff check .  # Windows
+python -m ruff check .                      # Linux / macOS
+.\.venv\Scripts\python.exe -m mypy app      # Windows
+python -m mypy app                          # Linux / macOS
+```
+
 ---
 
 ## 3. Despliegue en Docker (VM Proxmox)

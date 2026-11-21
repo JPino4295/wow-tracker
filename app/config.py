@@ -48,7 +48,7 @@ class ResetConfig:
     weekly_hour_utc: int = 7
 
     @classmethod
-    def from_env(cls) -> "ResetConfig":
+    def from_env(cls) -> ResetConfig:
         return cls(
             daily_hour_utc=_env_int("DAILY_RESET_HOUR_UTC", 7, 0, 23),
             weekly_weekday=_env_int("WEEKLY_RESET_WEEKDAY", 2, 0, 6),

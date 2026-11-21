@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.db import init_db
 from app.main import app
-
-UTC = timezone.utc
 
 
 @pytest.fixture
