@@ -485,6 +485,98 @@ def test_patch_source_kind_only(client: TestClient) -> None:
     ] == ["boss"]
 
 
+def test_farming_source_create_list_and_filter(client: TestClient) -> None:
+    created = client.post(
+        "/api/sources",
+        json={
+            "name": "Ruta de farmeo",
+            "kind": "farming",
+            "zone": "Isla de los Truenos",
+            "wowhead_url": "https://www.wowhead.com/es/zone=1234",
+        },
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["kind"] == "farming"
+    assert set(body) == {"id", "name", "kind", "zone", "wowhead_url"}
+
+    listed = client.get("/api/sources").json()
+    assert listed == [body]
+
+    item = client.post(
+        "/api/items",
+        json={**mount_payload(), "sources": [{"source_id": body["id"]}]},
+    )
+    assert item.status_code == 201, item.text
+    client.post(
+        "/api/items",
+        json={**mount_payload(), "name": "Objeto sin fuente", "wowhead_id": 137541},
+    )
+
+    filtered = client.get("/api/items?source_kind=farming").json()
+    assert [entry["name"] for entry in filtered] == ["Riendas de la venganza"]
+    assert filtered[0]["sources"][0]["source_kind"] == "farming"
+
+    duplicate = client.post(
+        "/api/sources", json={"name": "Ruta de farmeo", "kind": "farming"}
+    )
+    assert duplicate.status_code == 409
+    invalid = client.post("/api/sources", json={"name": "Mal", "kind": "wrong"})
+    assert invalid.status_code == 422
+
+
+def test_farming_source_does_not_force_once(client: TestClient) -> None:
+    farming = client.post(
+        "/api/sources", json={"name": "Ruta de farmeo", "kind": "farming"}
+    ).json()
+    secret = client.post(
+        "/api/sources", json={"name": "Cofre de secreto", "kind": "secret"}
+    ).json()
+
+    created = client.post(
+        "/api/items",
+        json={**mount_payload(), "sources": [{"source_id": farming["id"]}]},
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["periodicity"] == "weekly"
+
+    weekly = client.post(
+        "/api/items",
+        json={**mount_payload(), "name": "Otro objeto", "wowhead_id": 137542},
+    ).json()
+    patched = client.patch(
+        f"/api/items/{weekly['id']}",
+        json={
+            "sources": [
+                {
+                    "source_id": farming["id"],
+                    "drop_rate": None,
+                    "difficulty": "",
+                    "conditions": "",
+                }
+            ]
+        },
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["periodicity"] == "weekly"
+
+    secret_patch = client.patch(
+        f"/api/items/{weekly['id']}",
+        json={
+            "sources": [
+                {
+                    "source_id": secret["id"],
+                    "drop_rate": None,
+                    "difficulty": "",
+                    "conditions": "",
+                }
+            ]
+        },
+    )
+    assert secret_patch.status_code == 200, secret_patch.text
+    assert secret_patch.json()["periodicity"] == "once"
+
+
 def test_owner_assignment_is_persisted_and_validation_rejects_unknown_users(
     client: TestClient,
 ) -> None:

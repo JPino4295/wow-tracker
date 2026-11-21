@@ -27,6 +27,7 @@ class SourceKind(str, Enum):
     rare = "rare"
     boss = "boss"
     secret = "secret"
+    farming = "farming"
 
 
 def _http_url(value: str) -> str:
