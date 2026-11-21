@@ -1113,3 +1113,74 @@ def test_user_deletion_is_blocked_when_last_or_still_referenced(
     assert last.status_code == 409, last.text
     assert "last player" in last.json()["detail"]
     assert client.delete("/api/users/9999").status_code == 404
+
+
+def test_foreign_items_are_listed_last_for_selected_viewer(client: TestClient) -> None:
+    users = client.get("/api/meta").json()["users"]
+    first, second = users[0]["id"], users[1]["id"]
+
+    def add(name: str, wowhead_id: int, owner: int | None) -> None:
+        created = client.post(
+            "/api/items",
+            json={
+                **mount_payload(),
+                "name": name,
+                "wowhead_id": wowhead_id,
+                "owner_user_id": owner,
+            },
+        )
+        assert created.status_code == 201, created.text
+
+    add("A compartida", 137600, None)
+    add("B ajena", 137601, second)
+    add("C propia", 137602, first)
+    add("D ajena", 137603, second)
+    add("E compartida", 137604, None)
+
+    listed = client.get(f"/api/items?user_id={first}").json()
+    assert [item["name"] for item in listed] == [
+        "A compartida",
+        "C propia",
+        "E compartida",
+        "B ajena",
+        "D ajena",
+    ]
+
+
+def test_foreign_items_are_listed_last_with_combined_filters(
+    client: TestClient, source_id: int
+) -> None:
+    users = client.get("/api/meta").json()["users"]
+    first, second = users[0]["id"], users[1]["id"]
+
+    def add(name: str, wowhead_id: int, owner: int | None) -> None:
+        created = client.post(
+            "/api/items",
+            json={
+                **mount_payload(),
+                "name": name,
+                "wowhead_id": wowhead_id,
+                "owner_user_id": owner,
+                "sources": [{"source_id": source_id}],
+            },
+        )
+        assert created.status_code == 201, created.text
+
+    add("Riendas A compartida", 137610, None)
+    add("Riendas B ajena", 137611, second)
+    add("Riendas C propia", 137612, first)
+    add("Riendas D ajena", 137613, second)
+    add("Riendas E compartida", 137614, None)
+    add("Montura descartada", 137615, first)
+
+    filtered = client.get(
+        f"/api/items?type=mount&periodicity=weekly&source_kind=raid"
+        f"&q=Riendas&status=pending&user_id={first}"
+    ).json()
+    assert [item["name"] for item in filtered] == [
+        "Riendas A compartida",
+        "Riendas C propia",
+        "Riendas E compartida",
+        "Riendas B ajena",
+        "Riendas D ajena",
+    ]
