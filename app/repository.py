@@ -17,6 +17,7 @@ from .schemas import (
     ProgressOut,
     SourceCreate,
     SourceOut,
+    SourceUpdate,
     UserOut,
 )
 
@@ -117,6 +118,57 @@ def create_source(connection: sqlite3.Connection, payload: SourceCreate) -> Sour
         zone=payload.zone,
         wowhead_url=payload.wowhead_url,
     )
+
+
+def update_source(
+    connection: sqlite3.Connection, source_id: int, payload: SourceUpdate
+) -> SourceOut | None:
+    row = connection.execute(
+        "SELECT id, name, kind, zone, wowhead_url FROM sources WHERE id = ?",
+        (source_id,),
+    ).fetchone()
+    if row is None:
+        return None
+
+    data = payload.model_dump(exclude_unset=True)
+    if data:
+        assignments = ", ".join(f"{column} = ?" for column in data)
+        try:
+            connection.execute(
+                f"UPDATE sources SET {assignments} WHERE id = ?",
+                [_plain(value) for value in data.values()] + [source_id],
+            )
+            connection.commit()
+        except sqlite3.IntegrityError:
+            connection.rollback()
+            raise
+
+    row = connection.execute(
+        "SELECT id, name, kind, zone, wowhead_url FROM sources WHERE id = ?",
+        (source_id,),
+    ).fetchone()
+    return SourceOut(**dict(row))
+
+
+def source_exists(connection: sqlite3.Connection, source_id: int) -> bool:
+    return (
+        connection.execute("SELECT 1 FROM sources WHERE id = ?", (source_id,)).fetchone()
+        is not None
+    )
+
+
+def source_usage(connection: sqlite3.Connection, source_id: int) -> int:
+    return int(
+        connection.execute(
+            "SELECT COUNT(*) FROM item_sources WHERE source_id = ?", (source_id,)
+        ).fetchone()[0]
+    )
+
+
+def delete_source(connection: sqlite3.Connection, source_id: int) -> bool:
+    cursor = connection.execute("DELETE FROM sources WHERE id = ?", (source_id,))
+    connection.commit()
+    return cursor.rowcount > 0
 
 
 def _source_links(
