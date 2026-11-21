@@ -22,6 +22,14 @@ from .schemas import (
     UserOut,
 )
 
+
+def _inserted_id(cursor: sqlite3.Cursor) -> int:
+    """SQLite always sets lastrowid after INSERT; the stub types it as optional."""
+    value = cursor.lastrowid
+    if value is None:
+        raise RuntimeError("INSERT did not return a row id")
+    return value
+
 ITEM_COLUMNS = (
     "id",
     "wowhead_id",
@@ -69,7 +77,7 @@ def create_user(connection: sqlite3.Connection, name: str) -> int:
         "INSERT INTO users (name, created_at) VALUES (?, ?)", (name, timestamp())
     )
     connection.commit()
-    return int(cursor.lastrowid)
+    return _inserted_id(cursor)
 
 
 def rename_user(connection: sqlite3.Connection, user_id: int, name: str) -> bool:
@@ -113,7 +121,7 @@ def create_source(connection: sqlite3.Connection, payload: SourceCreate) -> Sour
     )
     connection.commit()
     return SourceOut(
-        id=cursor.lastrowid,
+        id=_inserted_id(cursor),
         name=payload.name,
         kind=payload.kind,
         zone=payload.zone,
@@ -313,7 +321,7 @@ def create_item(connection: sqlite3.Connection, payload: ItemCreate) -> int:
             f"INSERT INTO items ({', '.join(columns)}) VALUES ({', '.join('?' for _ in columns)})",
             values,
         )
-        item_id = int(cursor.lastrowid)
+        item_id = _inserted_id(cursor)
         _insert_source_links(connection, item_id, payload.sources)
         connection.commit()
     except sqlite3.IntegrityError as err:

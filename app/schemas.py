@@ -110,7 +110,7 @@ class ItemCreate(BaseModel):
     _validate_url = field_validator("url_wowhead")(_http_url)
 
     @model_validator(mode="after")
-    def fill_wowhead_url(self) -> "ItemCreate":
+    def fill_wowhead_url(self) -> ItemCreate:
         if not self.url_wowhead and self.wowhead_id is not None:
             self.url_wowhead = f"https://www.wowhead.com/es/item={self.wowhead_id}"
         return self

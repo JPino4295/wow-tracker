@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from .config import ResetConfig
-
-UTC = timezone.utc
 
 
 def as_utc(value: datetime) -> datetime:
@@ -18,7 +16,7 @@ def as_utc(value: datetime) -> datetime:
 
 def parse_timestamp(value: str) -> datetime:
     """Parse an ISO-8601 timestamp stored in the database (UTC)."""
-    return as_utc(datetime.fromisoformat(value.strip().replace("Z", "+00:00")))
+    return as_utc(datetime.fromisoformat(value.strip()))
 
 
 def utc_now() -> datetime:

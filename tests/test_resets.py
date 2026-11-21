@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
 from app.config import ResetConfig
 from app.resets import as_utc, is_done, next_reset, parse_timestamp, period_start
 
-UTC = timezone.utc
 DEFAULT = ResetConfig(daily_hour_utc=7, weekly_weekday=2, weekly_hour_utc=7)
 
 
