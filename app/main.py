@@ -170,7 +170,14 @@ def items(
                 return False
         return not (q and q.strip().lower() not in f"{item.name} {item.description}".lower())
 
-    return [item for item in result if matches(item)]
+    visible = [item for item in result if matches(item)]
+    if effective_user is None:
+        return visible
+    return sorted(
+        visible,
+        key=lambda item: item.owner_user_id is not None
+        and item.owner_user_id != effective_user,
+    )
 
 
 @app.post("/api/items", response_model=ItemOut, status_code=http_status.HTTP_201_CREATED)
