@@ -124,6 +124,13 @@ algo no cambia el estado del otro jugador.
 ## 5. Uso de la interfaz
 
 - El **selector "Visto por"** elige qué jugador se ve; se recuerda en el navegador.
+- Los botones **Tareas** y **Fuentes** cambian de vista. Ambas usan el mismo estilo de
+  tarjetas y su acción principal en la cabecera: **+ Añadir objeto** en Tareas y
+  **+ Nueva fuente** en Fuentes. En Fuentes, **✎ Editar** en cada tarjeta abre el mismo
+  modal para cambiar nombre, tipo (Raid, Rare, Boss, Secreto o Farming), zona y URL.
+- **🗑 Borrar** elimina una fuente solo si ningún objeto la usa: antes se pide
+  confirmación (no se puede deshacer) y, si la usara algún objeto, la web muestra el
+  rechazo y la fuente y sus vínculos siguen intactos.
 - En **⚙** puedes renombrar jugadores, añadir nuevos con **+ Añadir jugador** y
   borrarlos con **🗑**. El nombre del jugador es obligatorio y único (no puede
   repetirse). No se puede eliminar al último jugador, ni a uno con objetos
@@ -138,13 +145,13 @@ algo no cambia el estado del otro jugador.
 - **Marcar hecho** guarda `last_done_at` para el jugador elegido.
 - **+ Añadir objeto** crea el objeto con sus fuentes. El campo **Para quién** permite
   asignarlo a **Ambos** (valor por defecto), a Jugador 1 o a Jugador 2. Si falta una
-  fuente, se puede crear desde el propio formulario. El icono local se guarda como
-  nombre de archivo en `data/images/` y se sirve desde `/media/<nombre>` (también
-  admite URL).
+  fuente, créala en **Fuentes** y vuelve al formulario: la selección se actualiza sola.
+  El icono local se guarda como nombre de archivo en `data/images/` y se sirve desde
+  `/media/<nombre>` (también admite URL).
 - El botón **✎ Editar** de la ficha abre el formulario completo para cambiar nombre,
   Wowhead ID/URL, tipo, periodicidad, «Para quién», icono, descripción, notas **y
-  fuentes**. También incluye el creador rápido de fuentes, así que puedes añadir una
-  fuente nueva a un objeto que se creó sin ninguna. Si no cambias la selección, se
+  fuentes**. Solo se pueden elegir fuentes ya creadas; para añadir una nueva, créala
+  en **Fuentes** antes de editar el objeto. Si no cambias la selección, se
   conservan el drop rate/dificultad/condiciones ya guardados; si la cambias, esos
   valores se mantienen para las fuentes que sigan seleccionadas. Las fuentes ya
   asignadas también se pueden editar desde la propia ficha.
@@ -168,6 +175,10 @@ curl -X POST http://127.0.0.1:8000/api/items \
   -H 'Content-Type: application/json' \
   -d '{"name":"Riendas de la venganza","wowhead_id":137539,"type":"mount","periodicity":"weekly","sources":[{"source_id":1,"drop_rate":10,"difficulty":"Mítico","conditions":"Rare drop"}]}'
 ```
+
+Las fuentes también se pueden editar con `PATCH /api/sources/<id>` y borrar con
+`DELETE /api/sources/<id>`: el borrado devuelve `204` solo si ningún objeto la usa
+y `409` si todavía hay vínculos.
 
 `owner_user_id` es opcional: omítelo (o envía `null`) para "Ambos", o envía el
 `id` devuelto por `/api/meta` para asignarlo a un jugador concreto.
