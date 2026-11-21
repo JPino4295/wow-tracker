@@ -28,6 +28,7 @@ from .schemas import (
     SourceCreate,
     SourceKind,
     SourceOut,
+    SourceUpdate,
     UserUpdate,
 )
 
@@ -95,6 +96,39 @@ def add_source(
         raise HTTPException(
             http_status.HTTP_409_CONFLICT, "That source already exists"
         ) from err
+
+
+@app.patch("/api/sources/{source_id}", response_model=SourceOut)
+def edit_source(
+    source_id: int,
+    payload: SourceUpdate,
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> SourceOut:
+    try:
+        updated = repo.update_source(connection, source_id, payload)
+    except sqlite3.IntegrityError as err:
+        raise HTTPException(
+            http_status.HTTP_409_CONFLICT, "That source already exists"
+        ) from err
+    if updated is None:
+        raise HTTPException(http_status.HTTP_404_NOT_FOUND, "Source not found")
+    return updated
+
+
+@app.delete("/api/sources/{source_id}", status_code=http_status.HTTP_204_NO_CONTENT)
+def remove_source(
+    source_id: int,
+    connection: sqlite3.Connection = Depends(get_connection),
+) -> None:
+    if not repo.source_exists(connection, source_id):
+        raise HTTPException(http_status.HTTP_404_NOT_FOUND, "Source not found")
+    if repo.source_usage(connection, source_id):
+        raise HTTPException(
+            http_status.HTTP_409_CONFLICT,
+            "Source is still used by items. Unlink or delete them first.",
+        )
+    if not repo.delete_source(connection, source_id):
+        raise HTTPException(http_status.HTTP_404_NOT_FOUND, "Source not found")
 
 
 @app.get("/api/items", response_model=list[ItemOut])

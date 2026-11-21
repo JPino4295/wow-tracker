@@ -56,6 +56,18 @@ class SourceOut(BaseModel):
     wowhead_url: str
 
 
+class SourceUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    kind: SourceKind | None = None
+    zone: str | None = Field(default=None, max_length=200)
+    wowhead_url: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("wowhead_url")
+    @classmethod
+    def validate_url(cls, value: str | None) -> str | None:
+        return None if value is None else _http_url(value)
+
+
 class ItemSourceCreate(BaseModel):
     source_id: int
     drop_rate: float | None = Field(default=None, ge=0, le=100)

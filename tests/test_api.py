@@ -325,6 +325,148 @@ def test_notes_can_be_edited_and_invalid_input_is_rejected(
     assert duplicate_source.status_code == 409
 
 
+def test_patch_source_updates_fields_and_reuses_contract_errors(
+    client: TestClient,
+) -> None:
+    source = client.post(
+        "/api/sources",
+        json={"name": "Sagrario", "kind": "raid", "zone": "Torgasta"},
+    ).json()
+    other = client.post(
+        "/api/sources", json={"name": "Cofre", "kind": "secret"}
+    ).json()
+
+    patched = client.patch(
+        f"/api/sources/{source['id']}",
+        json={
+            "zone": "Selva de Huesos",
+            "wowhead_url": "https://www.wowhead.com/es/zone=1",
+        },
+    )
+    assert patched.status_code == 200, patched.text
+    assert set(patched.json()) == {"id", "name", "kind", "zone", "wowhead_url"}
+    assert patched.json() == {
+        "id": source["id"],
+        "name": "Sagrario",
+        "kind": "raid",
+        "zone": "Selva de Huesos",
+        "wowhead_url": "https://www.wowhead.com/es/zone=1",
+    }
+
+    assert client.patch("/api/sources/9999", json={"name": "Nadie"}).status_code == 404
+    assert (
+        client.patch(f"/api/sources/{source['id']}", json={"kind": "wrong"}).status_code
+        == 422
+    )
+    assert (
+        client.patch(
+            f"/api/sources/{source['id']}",
+            json={"wowhead_url": "ftp://inseguro"},
+        ).status_code
+        == 422
+    )
+    conflict = client.patch(
+        f"/api/sources/{other['id']}",
+        json={"name": "Sagrario", "kind": "raid"},
+    )
+    assert conflict.status_code == 409
+
+    assert client.get("/api/sources").json() == [other, patched.json()]
+
+
+def test_delete_unused_source_returns_204_and_preserves_items(
+    client: TestClient,
+) -> None:
+    used = client.post("/api/sources", json={"name": "Sagrario", "kind": "raid"}).json()
+    unused = client.post(
+        "/api/sources", json={"name": "Ruta vieja", "kind": "boss"}
+    ).json()
+    user_id = client.get("/api/meta").json()["users"][0]["id"]
+    payload = mount_payload()
+    payload["sources"] = [{"source_id": used["id"]}]
+    item_id = client.post("/api/items", json=payload).json()["id"]
+    client.put(f"/api/items/{item_id}/progress?user_id={user_id}", json={"done": True})
+    before = client.get(f"/api/items/{item_id}").json()
+
+    deleted = client.delete(f"/api/sources/{unused['id']}")
+    assert deleted.status_code == 204, deleted.text
+    assert deleted.content == b""
+
+    assert [source["id"] for source in client.get("/api/sources").json()] == [used["id"]]
+    assert client.get(f"/api/items/{item_id}").json() == before
+    assert before["sources"][0]["source_id"] == used["id"]
+    assert before["progress"][str(user_id)]["done"] is True
+
+
+def test_delete_used_source_returns_409_and_keeps_links(client: TestClient) -> None:
+    source = client.post("/api/sources", json={"name": "Sagrario", "kind": "raid"}).json()
+    payload = mount_payload()
+    payload["sources"] = [{"source_id": source["id"]}]
+    item_id = client.post("/api/items", json=payload).json()["id"]
+    before = client.get(f"/api/items/{item_id}").json()
+
+    deleted = client.delete(f"/api/sources/{source['id']}")
+    assert deleted.status_code == 409, deleted.text
+    assert set(deleted.json()) == {"detail"}
+    assert deleted.json()["detail"]
+
+    assert client.get("/api/sources").json() == [source]
+    assert client.get(f"/api/items/{item_id}").json() == before
+    assert before["sources"][0]["source_id"] == source["id"]
+    assert before["sources"][0]["source_kind"] == "raid"
+
+
+def test_existing_source_and_item_routes_are_unchanged_after_source_changes(
+    client: TestClient,
+) -> None:
+    source = client.post(
+        "/api/sources",
+        json={
+            "name": "Sagrario",
+            "kind": "raid",
+            "zone": "Torgasta",
+            "wowhead_url": "https://www.wowhead.com/es/zone=1",
+        },
+    )
+    assert source.status_code == 201, source.text
+    unused = client.post("/api/sources", json={"name": "Vieja", "kind": "boss"}).json()
+    assert client.get("/api/sources").json() == [source.json(), unused]
+
+    item = client.post(
+        "/api/items",
+        json={**mount_payload(), "sources": [{"source_id": source.json()["id"]}]},
+    )
+    assert item.status_code == 201, item.text
+    before = item.json()
+
+    patched = client.patch(
+        f"/api/sources/{source.json()['id']}", json={"name": "Sagrario renombrado"}
+    )
+    assert patched.status_code == 200, patched.text
+    assert client.delete(f"/api/sources/{unused['id']}").status_code == 204
+
+    listed = client.get("/api/sources").json()
+    assert listed == [{**source.json(), "name": "Sagrario renombrado"}]
+    assert set(listed[0]) == {"id", "name", "kind", "zone", "wowhead_url"}
+
+    created = client.post("/api/sources", json={"name": "Nueva", "kind": "secret"})
+    assert created.status_code == 201, created.text
+    assert set(created.json()) == set(source.json())
+
+    items = client.get("/api/items").json()
+    assert len(items) == 1
+    assert set(items[0]) == set(before)
+    assert items[0]["id"] == before["id"]
+    assert items[0]["periodicity"] == "weekly"
+    assert items[0]["progress"] == before["progress"]
+    link = items[0]["sources"][0]
+    assert set(link) == set(before["sources"][0])
+    assert link["source_id"] == source.json()["id"]
+    assert link["source_kind"] == "raid"
+    assert link["source_name"] == "Sagrario renombrado"
+    assert client.get(f"/api/items/{before['id']}").json() == items[0]
+
+
 def test_owner_assignment_is_persisted_and_validation_rejects_unknown_users(
     client: TestClient,
 ) -> None:
