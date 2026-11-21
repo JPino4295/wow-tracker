@@ -472,6 +472,19 @@ def test_existing_source_and_item_routes_are_unchanged_after_source_changes(
     assert client.get(f"/api/items/{before['id']}").json() == items[0]
 
 
+def test_patch_source_kind_only(client: TestClient) -> None:
+    source = client.post("/api/sources", json={"name": "Sagrario", "kind": "raid"}).json()
+
+    patched = client.patch(f"/api/sources/{source['id']}", json={"kind": "boss"})
+    assert patched.status_code == 200, patched.text
+    assert patched.json() == {**source, "kind": "boss"}
+    assert [
+        item["kind"]
+        for item in client.get("/api/sources").json()
+        if item["id"] == source["id"]
+    ] == ["boss"]
+
+
 def test_owner_assignment_is_persisted_and_validation_rejects_unknown_users(
     client: TestClient,
 ) -> None:
