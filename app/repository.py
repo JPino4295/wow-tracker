@@ -12,6 +12,7 @@ from .resets import is_done, next_reset, utc_now
 from .schemas import (
     ItemCreate,
     ItemOut,
+    ItemSourceCreate,
     ItemSourceOut,
     ItemUpdate,
     ProgressOut,
@@ -359,7 +360,9 @@ def _insert_source_links(
 ) -> None:
     for link in links:
         values = (
-            link if isinstance(link, dict) else link.model_dump()
+            link
+            if isinstance(link, ItemSourceCreate)
+            else ItemSourceCreate.model_validate(link)
         )
         connection.execute(
             """
@@ -368,10 +371,10 @@ def _insert_source_links(
             """,
             (
                 item_id,
-                values["source_id"],
-                values["drop_rate"],
-                values["difficulty"],
-                values["conditions"],
+                values.source_id,
+                values.drop_rate,
+                values.difficulty,
+                values.conditions,
             ),
         )
 
