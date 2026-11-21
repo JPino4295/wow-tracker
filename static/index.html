@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0e1117" />
     <title>WoW Farm Tracker</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=4" />
   </head>
   <body>
     <header class="topbar">
@@ -19,58 +19,81 @@
       <div class="top-actions">
         <label class="inline" for="user-select">Visto por</label>
         <select id="user-select" aria-label="Jugador activo"></select>
+        <div class="view-switch" role="group" aria-label="Vista">
+          <button id="btn-items" class="ghost" type="button" aria-pressed="true">Tareas</button>
+          <button id="btn-sources" class="ghost" type="button" aria-pressed="false">Fuentes</button>
+        </div>
         <button id="btn-settings" class="icon-btn" type="button" aria-label="Editar nombres" title="Editar nombres">⚙</button>
-        <button id="btn-add" class="primary" type="button">+ Añadir objeto</button>
       </div>
     </header>
 
     <main>
-      <section class="filters" aria-label="Filtros">
-        <label>Tipo
-          <select id="f-type">
-            <option value="">Todos</option>
-            <option value="mount">Montura</option>
-            <option value="transmog">Transfiguración</option>
-            <option value="toy">Juguete</option>
-            <option value="pet">Mascota</option>
-            <option value="other">Otros</option>
-          </select>
-        </label>
-        <label>Periodicidad
-          <select id="f-periodicity">
-            <option value="">Todas</option>
-            <option value="daily">Diaria</option>
-            <option value="weekly">Semanal</option>
-          </select>
-        </label>
-        <label>Fuente
-          <select id="f-source"><option value="">Todas</option></select>
-        </label>
-        <label>Tipo de fuente
-          <select id="f-source-kind">
-            <option value="">Todos</option>
-            <option value="raid">Raid</option>
-            <option value="rare">Rare</option>
-            <option value="boss">Boss</option>
-            <option value="secret">Secreto</option>
-            <option value="farming">Farming</option>
-          </select>
-        </label>
-        <label>Estado
-          <select id="f-status">
-            <option value="">Todos</option>
-            <option value="pending">Pendiente</option>
-            <option value="done">Hecho</option>
-          </select>
-        </label>
-        <label>Buscar
-          <input id="f-q" type="search" placeholder="Nombre o descripción" />
-        </label>
-        <button id="btn-clear" class="ghost" type="button">Limpiar</button>
+      <section id="items-view">
+        <div class="view-head">
+          <h2 id="items-title" tabindex="-1">Tareas</h2>
+          <div class="top-actions">
+            <button id="btn-add" class="primary" type="button">+ Añadir objeto</button>
+          </div>
+        </div>
+
+        <section id="item-filters" class="filters" aria-label="Filtros">
+          <label>Tipo
+            <select id="f-type">
+              <option value="">Todos</option>
+              <option value="mount">Montura</option>
+              <option value="transmog">Transfiguración</option>
+              <option value="toy">Juguete</option>
+              <option value="pet">Mascota</option>
+              <option value="other">Otros</option>
+            </select>
+          </label>
+          <label>Periodicidad
+            <select id="f-periodicity">
+              <option value="">Todas</option>
+              <option value="daily">Diaria</option>
+              <option value="weekly">Semanal</option>
+            </select>
+          </label>
+          <label>Fuente
+            <select id="f-source"><option value="">Todas</option></select>
+          </label>
+          <label>Tipo de fuente
+            <select id="f-source-kind">
+              <option value="">Todos</option>
+              <option value="raid">Raid</option>
+              <option value="rare">Rare</option>
+              <option value="boss">Boss</option>
+              <option value="secret">Secreto</option>
+              <option value="farming">Farming</option>
+            </select>
+          </label>
+          <label>Estado
+            <select id="f-status">
+              <option value="">Todos</option>
+              <option value="pending">Pendiente</option>
+              <option value="done">Hecho</option>
+            </select>
+          </label>
+          <label>Buscar
+            <input id="f-q" type="search" placeholder="Nombre o descripción" />
+          </label>
+          <button id="btn-clear" class="ghost" type="button">Limpiar</button>
+        </section>
+
+        <p id="summary" class="summary" role="status"></p>
+        <section id="item-list" class="cards" aria-label="Listado de objetos"></section>
       </section>
 
-      <p id="summary" class="summary" role="status"></p>
-      <section id="item-list" class="cards" aria-label="Listado de objetos"></section>
+      <section id="sources-view" hidden>
+        <div class="view-head">
+          <h2 id="sources-title" tabindex="-1">Fuentes</h2>
+          <div class="top-actions">
+            <button id="btn-source-create" class="primary" type="button">+ Nueva fuente</button>
+          </div>
+        </div>
+        <p id="sources-message" class="error" role="alert" hidden></p>
+        <div id="source-list" class="cards" aria-label="Fuentes"></div>
+      </section>
     </main>
 
     <dialog id="detail-dialog" class="modal">
@@ -134,25 +157,6 @@
           </label>
         </div>
 
-        <fieldset class="quick-source">
-          <legend>¿Falta una fuente? Créala aquí</legend>
-          <div class="form-grid">
-            <label>Nombre <input id="new-source-name" placeholder="Sagrario de dominación" /></label>
-            <label>Tipo
-              <select id="new-source-kind">
-                <option value="raid">Raid</option>
-                <option value="boss">Boss</option>
-                <option value="rare">Rare</option>
-                <option value="secret">Secreto</option>
-                <option value="farming">Farming</option>
-              </select>
-            </label>
-            <label>Zona <input id="new-source-zone" /></label>
-            <label>URL <input id="new-source-url" type="url" /></label>
-          </div>
-          <button id="btn-new-source" class="ghost" type="button">+ Crear fuente</button>
-        </fieldset>
-
         <div class="dialog-actions">
           <button class="ghost" type="button" data-close>Cancelar</button>
           <button class="primary" type="submit">Guardar objeto</button>
@@ -208,25 +212,6 @@
           </label>
         </div>
 
-        <fieldset class="quick-source">
-          <legend>¿Falta una fuente? Créala aquí</legend>
-          <div class="form-grid">
-            <label>Nombre <input id="edit-new-source-name" placeholder="Sagrario de dominación" /></label>
-            <label>Tipo
-              <select id="edit-new-source-kind">
-                <option value="raid">Raid</option>
-                <option value="boss">Boss</option>
-                <option value="rare">Rare</option>
-                <option value="secret">Secreto</option>
-                <option value="farming">Farming</option>
-              </select>
-            </label>
-            <label>Zona <input id="edit-new-source-zone" /></label>
-            <label>URL <input id="edit-new-source-url" type="url" /></label>
-          </div>
-          <button id="edit-btn-new-source" class="ghost" type="button">+ Crear fuente</button>
-        </fieldset>
-
         <div class="dialog-actions">
           <button class="ghost" type="button" data-close>Cancelar</button>
           <button class="primary" type="submit">Guardar cambios</button>
@@ -246,6 +231,37 @@
       </form>
     </dialog>
 
-    <script src="/static/app.js" defer></script>
+    <dialog id="source-dialog" class="modal" aria-labelledby="source-dialog-title">
+      <button class="close" type="button" data-close aria-label="Cerrar formulario de fuente">✕</button>
+      <h2 id="source-dialog-title">Nueva fuente</h2>
+      <form id="source-form">
+        <input type="hidden" name="source_id" />
+        <p id="source-error" class="error" role="alert" hidden></p>
+        <div class="form-grid">
+          <label class="span-2">Nombre *
+            <input name="name" required maxlength="200" aria-describedby="source-error" placeholder="Sagrario de dominación" />
+          </label>
+          <label>Tipo *
+            <select name="kind" aria-describedby="source-error">
+              <option value="raid">Raid</option>
+              <option value="rare">Rare</option>
+              <option value="boss">Boss</option>
+              <option value="secret">Secreto</option>
+              <option value="farming">Farming</option>
+            </select>
+          </label>
+          <label>Zona <input name="zone" maxlength="200" aria-describedby="source-error" /></label>
+          <label class="span-2">URL de Wowhead
+            <input name="wowhead_url" type="url" maxlength="1000" aria-describedby="source-error" placeholder="https://www.wowhead.com/es/zone=…" />
+          </label>
+        </div>
+        <div class="dialog-actions">
+          <button class="ghost" type="button" data-close>Cancelar</button>
+          <button class="primary" type="submit">Guardar fuente</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/static/app.js?v=4" defer></script>
   </body>
 </html>

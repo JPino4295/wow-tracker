@@ -31,7 +31,9 @@ async function api(path, options = {}) {
     } catch (_) {
       /* non-JSON error */
     }
-    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    const error = new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    error.detail = detail;
+    throw error;
   }
   return response.status === 204 ? null : response.json();
 }
@@ -143,6 +145,97 @@ function renderSourceOptions() {
   selectValues(edit, editPrevious);
 }
 
+function renderSourceList() {
+  const list = $('source-list');
+  list.replaceChildren();
+  if (!state.sources.length) {
+    list.append(el('p', 'empty', 'No hay fuentes todavía.'));
+    return;
+  }
+  for (const source of state.sources) {
+    const card = el('article', 'card source-card');
+    const info = el('div', 'card-info');
+    info.append(el('div', 'card-title', source.name));
+    const badges = el('div', 'badges');
+    badges.append(badge(KIND_LABELS[source.kind] || source.kind));
+    info.append(badges);
+    const meta = el('div', 'card-meta');
+    if (source.zone) meta.append(document.createTextNode(source.zone));
+    if (source.wowhead_url) {
+      const link = el('a', null, 'Wowhead ↗');
+      link.href = source.wowhead_url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      meta.append(link);
+    }
+    if (meta.childNodes.length) info.append(meta);
+    card.append(info);
+
+    const actions = el('div', 'card-actions');
+    const edit = el('button', 'ghost small', '✎ Editar');
+    edit.type = 'button';
+    edit.id = `source-edit-${source.id}`;
+    edit.setAttribute('aria-label', `Editar ${source.name}`);
+    edit.addEventListener('click', (event) => openSourceForm(event.currentTarget, source));
+    const remove = el('button', 'ghost small danger', '🗑 Borrar');
+    remove.type = 'button';
+    remove.id = `source-delete-${source.id}`;
+    remove.setAttribute('aria-label', `Borrar ${source.name}`);
+    remove.addEventListener('click', () => deleteSource(source));
+    actions.append(edit, remove);
+    card.append(actions);
+    list.append(card);
+  }
+}
+
+function setView(name) {
+  const showSources = name === 'sources';
+  $('items-view').hidden = showSources;
+  $('sources-view').hidden = !showSources;
+  $('btn-sources').setAttribute('aria-pressed', String(showSources));
+  $('btn-items').setAttribute('aria-pressed', String(!showSources));
+  (showSources ? $('sources-title') : $('items-title')).focus();
+}
+
+function openSourceForm(trigger, source = null) {
+  const form = $('source-form');
+  form.reset();
+  $('source-error').hidden = true;
+  form.dataset.trigger = trigger?.id || '';
+  if (source) {
+    form.elements['source_id'].value = String(source.id);
+    form.elements['name'].value = source.name;
+    form.elements['kind'].value = source.kind;
+    form.elements['zone'].value = source.zone;
+    form.elements['wowhead_url'].value = source.wowhead_url;
+    $('source-dialog-title').textContent = 'Editar fuente';
+    form.querySelector('[type=submit]').textContent = 'Guardar cambios';
+  } else {
+    $('source-dialog-title').textContent = 'Nueva fuente';
+    form.querySelector('[type=submit]').textContent = 'Guardar fuente';
+  }
+  $('source-dialog').showModal();
+  form.elements['name'].focus();
+}
+
+function showSourceMessage(text) {
+  const box = $('sources-message');
+  box.textContent = text;
+  box.hidden = !text;
+}
+
+async function deleteSource(source) {
+  if (!window.confirm(`¿Borrar la fuente «${source.name}»? No se puede deshacer.`)) return;
+  try {
+    await api(`/api/sources/${source.id}`, { method: 'DELETE' });
+    showSourceMessage('');
+    await loadSources();
+    (document.querySelector('[id^="source-delete-"]') || $('btn-source-create')).focus();
+  } catch (error) {
+    showSourceMessage(error.message);
+  }
+}
+
 async function loadMeta() {
   state.meta = await api('/api/meta');
   state.users = state.meta.users;
@@ -164,6 +257,7 @@ async function loadMeta() {
 async function loadSources() {
   state.sources = await api('/api/sources');
   renderSourceOptions();
+  renderSourceList();
 }
 
 function queryString() {
@@ -200,7 +294,6 @@ function cardFor(item) {
 
   const open = el('button', 'card-open');
   open.type = 'button';
-  open.setAttribute('aria-label', `Ver ficha de ${item.name}`);
   const info = el('div', 'card-info');
   info.append(el('div', 'card-title', item.name));
   const badges = el('div', 'badges');
@@ -557,6 +650,9 @@ function bindEvents() {
     loadItems();
   });
   $('btn-settings').addEventListener('click', openSettings);
+  $('btn-sources').addEventListener('click', () => setView('sources'));
+  $('btn-items').addEventListener('click', () => setView('items'));
+  $('btn-source-create').addEventListener('click', (event) => openSourceForm(event.currentTarget));
   $('btn-add').addEventListener('click', () => $('add-dialog').showModal());
 
   for (const button of document.querySelectorAll('[data-close]')) {
@@ -651,31 +747,34 @@ function bindEvents() {
     }
   });
 
-  async function createSource(prefix, targetId) {
+  $('source-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
     const payload = {
-      name: $(`${prefix}-name`).value.trim(),
-      kind: $(`${prefix}-kind`).value,
-      zone: $(`${prefix}-zone`).value.trim(),
-      wowhead_url: $(`${prefix}-url`).value.trim(),
+      name: data.get('name').trim(),
+      kind: data.get('kind'),
+      zone: data.get('zone').trim(),
+      wowhead_url: data.get('wowhead_url').trim(),
     };
-    if (!payload.name) {
-      window.alert('Escribe el nombre de la fuente.');
-      return;
-    }
+    const sourceId = data.get('source_id');
     try {
-      const created = await api('/api/sources', jsonOptions('POST', payload));
-      for (const suffix of ['name', 'zone', 'url']) $(`${prefix}-${suffix}`).value = '';
+      if (sourceId) {
+        await api(`/api/sources/${sourceId}`, jsonOptions('PATCH', payload));
+      } else {
+        await api('/api/sources', jsonOptions('POST', payload));
+      }
+      $('source-dialog').close();
       await loadSources();
-      const option = Array.from($(targetId).options)
-        .find((entry) => entry.value === String(created.id));
-      if (option) option.selected = true;
+      $(form.dataset.trigger || 'btn-source-create')?.focus();
     } catch (error) {
-      window.alert(error.message);
+      const box = $('source-error');
+      box.textContent = Array.isArray(error.detail)
+        ? error.detail.map((entry) => entry.msg).join('; ')
+        : (error.detail || error.message);
+      box.hidden = false;
     }
-  }
-
-  $('btn-new-source').addEventListener('click', () => createSource('new-source', 'add-sources'));
-  $('edit-btn-new-source').addEventListener('click', () => createSource('edit-new-source', 'edit-sources'));
+  });
 
   $('settings-form').addEventListener('submit', async (event) => {
     event.preventDefault();
