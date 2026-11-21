@@ -15,6 +15,12 @@ def test_readme_documents_lint_and_typecheck() -> None:
     assert "mypy app" in readme
 
 
+def test_dev_requirements_pin_tools() -> None:
+    pins = (ROOT / "requirements-dev.txt").read_text(encoding="utf-8")
+    assert "ruff==0.17.6" in pins
+    assert "mypy==2.4.1" in pins
+
+
 def test_mypy_app_exits_cleanly() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "mypy", "app"],
