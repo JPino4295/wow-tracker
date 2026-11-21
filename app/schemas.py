@@ -67,6 +67,13 @@ class SourceUpdate(BaseModel):
     def validate_url(cls, value: str | None) -> str | None:
         return None if value is None else _http_url(value)
 
+    @model_validator(mode="after")
+    def reject_explicit_nulls(self) -> SourceUpdate:
+        for field in self.model_fields_set:
+            if getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        return self
+
 
 class ItemSourceCreate(BaseModel):
     source_id: int

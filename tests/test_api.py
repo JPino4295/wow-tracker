@@ -365,6 +365,10 @@ def test_patch_source_updates_fields_and_reuses_contract_errors(
         ).status_code
         == 422
     )
+    for field in ("name", "kind", "zone", "wowhead_url"):
+        null_patch = client.patch(f"/api/sources/{source['id']}", json={field: None})
+        assert null_patch.status_code == 422, null_patch.text
+
     conflict = client.patch(
         f"/api/sources/{other['id']}",
         json={"name": "Sagrario", "kind": "raid"},
@@ -391,6 +395,7 @@ def test_delete_unused_source_returns_204_and_preserves_items(
     deleted = client.delete(f"/api/sources/{unused['id']}")
     assert deleted.status_code == 204, deleted.text
     assert deleted.content == b""
+    assert client.delete("/api/sources/9999").status_code == 404
 
     assert [source["id"] for source in client.get("/api/sources").json()] == [used["id"]]
     assert client.get(f"/api/items/{item_id}").json() == before
