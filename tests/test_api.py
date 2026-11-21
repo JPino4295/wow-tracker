@@ -706,6 +706,78 @@ def test_drop_rate_can_be_edited_after_creation(client: TestClient, source_id: i
     assert link["conditions"] == "Solo con la Rare activa"
 
 
+def test_patch_with_partial_source_link_applies_link_defaults(
+    client: TestClient, source_id: int
+) -> None:
+    item_id = client.post("/api/items", json=mount_payload()).json()["id"]
+
+    patched = client.patch(
+        f"/api/items/{item_id}",
+        json={"sources": [{"source_id": source_id}]},
+    )
+    assert patched.status_code == 200, patched.text
+    link = patched.json()["sources"][0]
+    assert link["source_id"] == source_id
+    assert link["drop_rate"] is None
+    assert link["difficulty"] == ""
+    assert link["conditions"] == ""
+
+    listed = client.get("/api/items").json()
+    assert [item["id"] for item in listed] == [item_id]
+    listed_link = listed[0]["sources"][0]
+    assert listed_link["drop_rate"] is None
+    assert listed_link["difficulty"] == ""
+    assert listed_link["conditions"] == ""
+
+
+def test_patch_rejects_source_link_without_source_id(
+    client: TestClient, source_id: int
+) -> None:
+    item_id = client.post(
+        "/api/items",
+        json={**mount_payload(), "sources": [{"source_id": source_id}]},
+    ).json()["id"]
+    before = client.get(f"/api/items/{item_id}").json()
+
+    rejected = client.patch(
+        f"/api/items/{item_id}",
+        json={"sources": [{"drop_rate": 5}]},
+    )
+    assert rejected.status_code == 422, rejected.text
+    assert client.get(f"/api/items/{item_id}").json() == before
+
+
+def test_patch_of_scalar_fields_preserves_existing_source_links(
+    client: TestClient, source_id: int
+) -> None:
+    item_id = client.post(
+        "/api/items",
+        json={
+            **mount_payload(),
+            "sources": [
+                {
+                    "source_id": source_id,
+                    "drop_rate": 12.5,
+                    "difficulty": "Mítico",
+                    "conditions": "Solo en la última ala",
+                }
+            ],
+        },
+    ).json()["id"]
+
+    patched = client.patch(f"/api/items/{item_id}", json={"notes": "Nota nueva"})
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["notes"] == "Nota nueva"
+
+    listed = client.get("/api/items").json()
+    assert [item["id"] for item in listed] == [item_id]
+    link = listed[0]["sources"][0]
+    assert link["source_id"] == source_id
+    assert link["drop_rate"] == 12.5
+    assert link["difficulty"] == "Mítico"
+    assert link["conditions"] == "Solo en la última ala"
+
+
 def test_item_can_be_edited_completely(client: TestClient) -> None:
     second = client.get("/api/meta").json()["users"][1]["id"]
     item_id = client.post("/api/items", json=mount_payload()).json()["id"]
