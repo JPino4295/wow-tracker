@@ -143,6 +143,10 @@ def test_populated_legacy_schema_migrates_to_new_checks_idempotently(
     assert {"idx_items_type", "idx_items_periodicity"} <= indexes
 
     connection.execute("INSERT INTO sources (name, kind) VALUES ('Cofre', 'secret')")
+    connection.execute("INSERT INTO sources (name, kind) VALUES ('Ruta', 'farming')")
+    assert connection.execute(
+        "SELECT name, kind FROM sources WHERE kind = 'farming'"
+    ).fetchone() == ("Ruta", "farming")
     connection.execute(
         "INSERT INTO items (name, type, periodicity, created_at, updated_at) "
         "VALUES ('Reliquia', 'other', 'once', ?, ?)",
@@ -156,4 +160,41 @@ def test_populated_legacy_schema_migrates_to_new_checks_idempotently(
             "VALUES ('Mal', 'other', 'hourly', ?, ?)",
             (UTC_NOW, UTC_NOW),
         )
+    connection.close()
+
+
+def test_source_schema_with_secret_migrates_to_five_kinds(
+    tmp_path: Any, monkeypatch: Any
+) -> None:
+    db_file = Path(tmp_path) / "secret.db"
+    monkeypatch.setenv("DB_PATH", str(db_file))
+    monkeypatch.setenv("DATA_DIR", str(Path(tmp_path) / "data"))
+
+    connection = sqlite3.connect(db_file)
+    connection.execute(
+        """
+        CREATE TABLE sources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            kind TEXT NOT NULL CHECK (kind IN ('raid','rare','boss','secret')),
+            zone TEXT NOT NULL DEFAULT '',
+            wowhead_url TEXT NOT NULL DEFAULT '',
+            UNIQUE (name, kind)
+        )
+        """
+    )
+    connection.execute("INSERT INTO sources (id, name, kind) VALUES (1, 'Cofre', 'secret')")
+    connection.commit()
+    connection.close()
+
+    init_db(UTC_NOW)
+    init_db(UTC_NOW)
+
+    connection = sqlite3.connect(db_file)
+    assert connection.execute("SELECT id, name, kind FROM sources").fetchall() == [
+        (1, "Cofre", "secret")
+    ]
+    connection.execute("INSERT INTO sources (name, kind) VALUES ('Ruta', 'farming')")
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute("INSERT INTO sources (name, kind) VALUES ('Mal', 'wrong')")
     connection.close()
