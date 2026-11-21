@@ -136,7 +136,7 @@ algo no cambia el estado del otro jugador.
 - Los botones **Tareas** y **Fuentes** cambian de vista. Ambas usan el mismo estilo de
   tarjetas y su acción principal en la cabecera: **+ Añadir objeto** en Tareas y
   **+ Nueva fuente** en Fuentes. En Fuentes, **✎ Editar** en cada tarjeta abre el mismo
-  modal para cambiar nombre, tipo (Raid, Rare, Boss, Secreto o Farming), zona y URL.
+  modal para cambiar nombre, tipo (Raid, Rare, Boss, Secreto, Farming o Mazmorra), zona y URL.
 - **🗑 Borrar** elimina una fuente solo si ningún objeto la usa: antes se pide
   confirmación (no se puede deshacer) y, si la usara algún objeto, la web muestra el
   rechazo y la fuente y sus vínculos siguen intactos.
